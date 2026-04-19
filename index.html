@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solar Forecast</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f59e0b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Solar Forecast">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0f1a;
+    --surface: #111827;
+    --surface2: #1a2535;
+    --border: #1e2d45;
+    --border2: #2a3a52;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #f59e0b;
+    --accent2: #fb923c;
+    --accent-bg: rgba(245,158,11,0.1);
+    --accent-border: rgba(245,158,11,0.4);
+    --danger-bg: rgba(239,68,68,0.1);
+    --danger-border: rgba(239,68,68,0.4);
+    --danger-text: #fca5a5;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 0 0 60px;
+  }
+
+  #app {
+    width: 100%;
+    max-width: 480px;
+    padding: 0 16px;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    padding: 32px 0 24px;
+  }
+  .header-icon {
+    font-size: 36px;
+    display: block;
+    margin-bottom: 8px;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .header p {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+
+  /* Labels */
+  .label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  /* Inputs */
+  input[type="text"], input[type="number"] {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    padding: 10px 14px;
+    font-size: 15px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input[type="text"]:focus, input[type="number"]:focus {
+    border-color: var(--accent);
+  }
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+    height: 4px;
+    cursor: pointer;
+  }
+
+  /* Slider row */
+  .slider-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .slider-row span {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  /* Preset buttons */
+  .presets {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .preset-btn {
+    flex: 1;
+    padding: 6px 4px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-sm);
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .preset-btn.active, .preset-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-bg);
+  }
+
+  /* Azimuth grid */
+  .az-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .az-btn {
+    padding: 10px 4px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-sm);
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+  .az-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-bg);
+    font-weight: 700;
+  }
+
+  /* Coordinate row */
+  .coord-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .coord-row > div {
+    flex: 1;
+  }
+  .coord-row label {
+    font-size: 11px;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  /* GPS button */
+  .gps-btn {
+    padding: 10px 14px;
+    background: rgba(74,222,128,0.1);
+    border: 1px solid rgba(74,222,128,0.3);
+    border-radius: var(--radius-sm);
+    color: #4ade80;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .gps-btn:hover { background: rgba(74,222,128,0.18); }
+
+  /* Location row */
+  .loc-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .loc-row input { flex: 1; min-width: 0; }
+
+  /* Main button */
+  .calc-btn {
+    width: 100%;
+    padding: 18px;
+    background: linear-gradient(135deg, #d97706, #ea580c);
+    border: none;
+    border-radius: var(--radius);
+    color: #fff;
+    font-size: 17px;
+    font-weight: 800;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: opacity 0.2s, transform 0.1s;
+    letter-spacing: -0.2px;
+  }
+  .calc-btn:hover { opacity: 0.92; }
+  .calc-btn:active { transform: scale(0.98); }
+  .calc-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* Error box */
+  .error {
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-border);
+    border-radius: var(--radius-sm);
+    color: var(--danger-text);
+    padding: 12px 14px;
+    font-size: 13px;
+    margin-bottom: 12px;
+    display: none;
+  }
+
+  /* ── FORECAST SCREEN ── */
+  #vForecast { display: none; }
+
+  .back-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 0 16px;
+  }
+  .back-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-sm);
+    color: var(--muted);
+    padding: 7px 13px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .back-btn:hover { color: var(--text); }
+  .back-meta h2 { font-size: 17px; font-weight: 700; }
+  .back-meta p { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+  /* Summary metrics */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+  }
+  .metric-card .metric-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .metric-card .metric-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+  .metric-card .metric-unit {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  /* Day cards */
+  .day-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .day-card:hover { border-color: var(--border2); }
+  .day-card.selected { border-color: var(--accent-border); }
+
+  .day-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .day-date { font-size: 15px; font-weight: 600; }
+  .day-cloud { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .day-kwh { font-size: 22px; font-weight: 800; text-align: right; }
+  .day-kwh-unit { font-size: 11px; color: var(--muted); text-align: right; }
+
+  .day-bar-track {
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .day-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+
+  /* Hourly chart section */
+  #chartSection {
+    display: none;
+    margin-top: 16px;
+  }
+  .chart-label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    font-weight: 500;
+  }
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 200px;
+  }
+  .chart-note {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+
+  /* Info footer */
+  .info-footer {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 12px;
+    line-height: 1.7;
+  }
+  /* ── Tooltips ── */
+  .info-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: var(--border2); color: var(--muted);
+    font-size: 9px; font-weight: 800; cursor: pointer;
+    margin-left: 5px; flex-shrink: 0; vertical-align: middle;
+    transition: background 0.15s, color 0.15s; user-select: none;
+    font-style: normal; line-height: 1;
+  }
+  .info-btn:hover { background: var(--accent); color: #000; }
+
+  #tipBox {
+    position: fixed; z-index: 9999; max-width: 300px; width: calc(100vw - 32px);
+    background: #1a2535; border: 1px solid rgba(245,158,11,0.5);
+    border-radius: var(--radius); padding: 13px 15px;
+    font-size: 13px; color: var(--text); line-height: 1.65;
+    display: none; pointer-events: none;
+  }
+  #tipBox strong { color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ══ SETUP VIEW ══════════════════════════════════════════════ -->
+<div id="vSetup">
+  <div class="header">
+    <span class="header-icon">☀️</span>
+    <h1>Solar Forecast</h1>
+    <p>PV-Ertragsvorhersage · 7 Tage</p>
+    <p style="font-size:11px;color:var(--muted);margin-top:6px;letter-spacing:0.3px;">Entwickelt von Melting Hero</p>
+    <p style="font-size:10px;color:var(--muted);margin-top:3px;">Wetterdaten: <a href="https://open-meteo.com" target="_blank" style="color:var(--accent);text-decoration:none;">Open-Meteo</a> (CC BY 4.0) · Chart.js (MIT)</p>
+  </div>
+
+  <!-- Location -->
+  <div class="card">
+    <span class="label">📍 Standort <i class="info-btn" onclick="showTip(this,'<strong>Standort</strong><br>Bestimmt die Sonnenbahn und welche Wetterdaten geladen werden. Per GPS automatisch ermitteln oder Koordinaten manuell eingeben. Breite 51,2 / Länge 6,4 = Mönchengladbach.')">?</i></span>
+    <div class="loc-row">
+      <input type="text" id="iLocName" placeholder="Ortsname" value="Mönchengladbach" />
+      <button class="gps-btn" id="btnGps" onclick="doGps()">GPS</button>
+    </div>
+    <div class="coord-row">
+      <div>
+        <label>Breite (lat)</label>
+        <input type="number" id="iLat" step="0.001" value="51.196" />
+      </div>
+      <div>
+        <label>Länge (lon)</label>
+        <input type="number" id="iLon" step="0.001" value="6.444" />
+      </div>
+    </div>
+  </div>
+
+  <!-- kWp -->
+  <div class="card">
+    <div class="slider-row">
+      <span class="label" style="margin-bottom:0;">⚡ Anlagenleistung <i class="info-btn" onclick="showTip(this,'<strong>Kilowattpeak (kWp)</strong><br>Nennleistung deiner Anlage unter Standardtestbedingungen: 1000 W/m² Strahlung, 25°C Zelltemperatur. Steht auf dem Modul-Typenschild oder Datenblatt. Bei mehreren Modulen: Einzelleistungen addieren.')">?</i></span>
+      <span><span id="oKwp">10.0</span> kWp</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+    <input type="range" id="iKwp" min="0.5" max="50" step="0.5" value="10"
+           oninput="sR('iKwp','nKwp','oKwp',1)" style="flex:1;" />
+    <input type="number" id="nKwp" min="0.5" max="50" step="0.5" value="10.0"
+           oninput="sNi('nKwp','iKwp')" onchange="sNc('nKwp','iKwp','oKwp',1)"
+           style="width:64px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);" />
+    </div>
+  </div>
+
+  <!-- Tilt -->
+  <div class="card">
+    <div class="slider-row">
+      <span class="label" style="margin-bottom:0;">📐 Neigungswinkel <i class="info-btn" onclick="showTip(this,'<strong>Neigungswinkel (Tilt)</strong><br>Neigung der Modulfläche gegenüber der Horizontalen. 0° = flach liegend, 90° = senkrecht. Optimal für ~51°N (Mönchengladbach): 32–36°. Flachere Winkel liefern im Sommer mehr, steilere im Winter.')">?</i></span>
+      <span><span id="oTilt">30</span>°</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+    <input type="range" id="iTilt" min="0" max="60" step="1" value="30"
+           oninput="sR('iTilt','nTilt','oTilt',0)" style="flex:1;" />
+    <input type="number" id="nTilt" min="0" max="60" step="1" value="30"
+           oninput="sNi('nTilt','iTilt')" onchange="sNc('nTilt','iTilt','oTilt',0)"
+           style="width:64px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);" />
+    </div>
+    <div class="presets">
+      <button class="preset-btn" onclick="setTilt(10,this)">Flach 10°</button>
+      <button class="preset-btn active" onclick="setTilt(30,this)">Standard 30°</button>
+      <button class="preset-btn" onclick="setTilt(45,this)">Steil 45°</button>
+      <button class="preset-btn" onclick="setTilt(60,this)">Sehr steil</button>
+    </div>
+  </div>
+
+  <!-- Azimuth -->
+  <div class="card">
+    <div class="slider-row" style="margin-bottom:10px;">
+      <span class="label" style="margin-bottom:0;">🧭 Ausrichtung <i class="info-btn" onclick="showTip(this,'<strong>Azimut (Kompassrichtung)</strong><br>Himmelsrichtung wohin deine Module zeigen — nicht die Dachneigung. 180° Süd = optimal. SO/SW (135°/225°) kosten ca. 5% Jahresertrag. Bei Ost-West-Aufteilung zwei separate Berechnungen addieren.')">?</i></span>
+      <span id="oAzName" style="color:var(--accent);font-weight:700;">Süd</span>
+    </div>
+    <div class="az-grid">
+      <button class="az-btn" data-d="0"   onclick="setAz(0)">N</button>
+      <button class="az-btn" data-d="45"  onclick="setAz(45)">NO</button>
+      <button class="az-btn" data-d="90"  onclick="setAz(90)">O</button>
+      <button class="az-btn" data-d="135" onclick="setAz(135)">SO</button>
+      <button class="az-btn active" data-d="180" onclick="setAz(180)">S</button>
+      <button class="az-btn" data-d="225" onclick="setAz(225)">SW</button>
+      <button class="az-btn" data-d="270" onclick="setAz(270)">W</button>
+      <button class="az-btn" data-d="315" onclick="setAz(315)">NW</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:12px;">
+      <input type="range" id="iAzSlider" min="0" max="359" step="1" value="180"
+             oninput="setAzFromInput(+this.value)" style="flex:1;" />
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+        <input type="number" id="iAzDeg" min="0" max="359" step="1" value="180"
+               oninput="setAzFromInput(+this.value)"
+               style="width:66px;text-align:center;padding:8px 6px;font-size:15px;font-weight:700;color:var(--accent);" />
+        <span style="font-size:13px;color:var(--muted);">°</span>
+      </div>
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-top:6px;">0° = Nord · 90° = Ost · 180° = Süd · 270° = West</p>
+  </div>
+
+  <!-- Efficiency -->
+  <div class="card">
+    <div class="slider-row">
+      <span class="label" style="margin-bottom:0;">⚙️ DC-Systemwirkungsgrad <i class="info-btn" onclick="showTip(this,'<strong>DC-Systemwirkungsgrad</strong><br>Verluste zwischen Modul und WR-Eingang: Leitungswiderstände (1–3%), Verschmutzung (1–5%), Modul-Mismatch (1–2%), Alterung. <em>Nicht</em> der WR-Wirkungsgrad — der wird über die WR-Nennleistung separat modelliert. Typisch 78–85%.')">?</i></span>
+      <span><span id="oEff">80</span>%</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:4px;">
+    <input type="range" id="iEff" min="60" max="98" step="1" value="80"
+           oninput="sR('iEff','nEff','oEff',0)" style="flex:1;" />
+    <input type="number" id="nEff" min="60" max="98" step="1" value="80"
+           oninput="sNi('nEff','iEff')" onchange="sNc('nEff','iEff','oEff',0)"
+           style="width:64px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);" />
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-top:6px;">
+      Leitungsverluste · Verschmutzung · Modulalterung (ohne Temperatur &amp; WR — separat unten)
+    </p>
+  </div>
+
+  <!-- Advanced parameters -->
+  <div class="card">
+    <span class="label">🔧 Erweiterte Parameter</span>
+
+    <div class="slider-row" style="margin-bottom:6px;">
+      <span style="font-size:13px;color:var(--muted);font-weight:500;">WR-Nennleistung (AC) <i class="info-btn" onclick="showTip(this,'<strong>Wechselrichter-Nennleistung</strong><br>Maximale AC-Ausgangsleistung. Übersteigt die DC-Eingangsleistung diesen Wert, wird sie abgeregelt (Clipping). Steht auf dem WR-Typenschild. Balkonkraftwerk: 0,8 kW (gesetzliches Limit DE). Typisch: kWp × 0,8–0,85.')">?</i></span>
+      <span style="font-size:14px;font-weight:700;color:var(--accent);"><span id="oWr">1.9</span> kW</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
+    <input type="range" id="iWr" min="0.5" max="50" step="0.1" value="1.9"
+           oninput="sR('iWr','nWr','oWr',1)" style="flex:1;" />
+    <input type="number" id="nWr" min="0.5" max="50" step="0.1" value="1.9"
+           oninput="sNi('nWr','iWr')" onchange="sNc('nWr','iWr','oWr',1)"
+           style="width:64px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);" />
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">
+      Begrenzt die max. AC-Ausgangsleistung (Clipping). Typisch: kWp × 0,8–0,85
+    </p>
+
+    <div class="slider-row" style="margin-bottom:6px;">
+      <span style="font-size:13px;color:var(--muted);font-weight:500;">Temperaturkoeffizient P<sub>max</sub> <i class="info-btn" onclick="showTip(this,'<strong>Temperaturkoeffizient Pmax</strong><br>Leistungsverlust pro °C über 25°C Zelltemperatur. Steht im Modul-Datenblatt. Typwerte: Mono/Poly-Si −0,40%/°C · HJT (REC, Panasonic) −0,26%/°C · TOPCon −0,28–0,32%/°C. Bei 45°C Zelltemp verliert ein Standard-Modul ~8% Leistung.')">?</i></span>
+      <span style="font-size:14px;font-weight:700;color:var(--accent);">–<span id="oTc">0.40</span> %/°C</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
+    <input type="range" id="iTc" min="0.20" max="0.55" step="0.01" value="0.40"
+           oninput="sR('iTc','nTc','oTc',2)" style="flex:1;" />
+    <input type="number" id="nTc" min="0.20" max="0.55" step="0.01" value="0.40"
+           oninput="sNi('nTc','iTc')" onchange="sNc('nTc','iTc','oTc',2)"
+           style="width:64px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);" />
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">
+      Steht im Modul-Datenblatt. Mono/Poly-Si: ~0,40 % · HJT/TOPCon: ~0,25–0,30 %
+    </p>
+
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+      <span style="font-size:13px;color:var(--muted);font-weight:500;">Tagesverbrauch (Haushalt) <i class="info-btn" onclick="showTip(this,'<strong>Tagesverbrauch</strong><br>Dein durchschnittlicher Stromverbrauch pro Tag. Richtwerte DE: 1 Person ≈ 4–6 kWh/Tag · 2 Personen ≈ 8–10 kWh/Tag · 4 Personen ≈ 13–18 kWh/Tag. 0 = deaktiviert. Die Simulation verwendet ein gleichmäßiges Lastprofil (vereinfacht).')">?</i></span>
+      <span style="font-size:14px;font-weight:700;color:var(--accent);"><span id="oConsume">0</span> kWh/Tag</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
+    <input type="range" id="iConsume" min="0" max="60" step="0.5" value="0"
+           oninput="sR('iConsume','nConsume','oConsume',1)" style="flex:1;" />
+    <input type="number" id="nConsume" min="0" max="60" step="0.5" value="0"
+           oninput="sNi('nConsume','iConsume')" onchange="sNc('nConsume','iConsume','oConsume',1)"
+           style="width:64px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);" />
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">
+      0 = deaktiviert · Aktiviert Eigenverbrauchsberechnung (vereinfachtes Lastprofil)
+    </p>
+
+    <!-- Battery storage -->
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:2px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+        <span style="font-size:13px;color:var(--muted);font-weight:500;">🔋 Speicherkapazität <i class="info-btn" onclick="showTip(this,'<strong>Batteriespeicher-Kapazität</strong><br>Nennkapazität laut Datenblatt in kWh. Die tatsächlich nutzbare Kapazität ist etwas geringer durch BMS-Reserve und den Min.-SoC-Schutz. 0 = kein Speicher. Die Simulation führt den Ladestand über alle 7 Tage kontinuierlich weiter.')">?</i></span>
+        <span style="font-size:14px;font-weight:700;color:var(--accent);"><span id="oBat">4.8</span> kWh</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
+      <input type="range" id="iBat" min="0" max="30" step="0.1" value="4.8"
+             oninput="sR('iBat','nBat','oBat',1)" style="flex:1;" />
+      <input type="number" id="nBat" min="0" max="30" step="0.1" value="4.8"
+             oninput="sNi('nBat','iBat')" onchange="sNc('nBat','iBat','oBat',1)"
+             style="width:64px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);" />
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">
+        0 = kein Speicher · Nennkapazität laut Datenblatt
+      </p>
+
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <div style="flex:1;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Max. Ladeleistung <i class="info-btn" onclick="showTip(this,'<strong>Max. Ladeleistung</strong><br>Maximale Leistung mit der der Speicher geladen werden kann (kW). Limitiert wie schnell Solarüberschuss eingespeichert wird. Steht im Speicher-Datenblatt. Typisch für Heimspeicher: 1,0–3,0 kW.')">?</i></div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <input type="number" id="iBatChargeW" min="0.1" max="20" step="0.1" value="1.5"
+                   style="width:70px;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);text-align:center;" />
+            <span style="font-size:12px;color:var(--muted);">kW</span>
+          </div>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Max. Entladeleistung <i class="info-btn" onclick="showTip(this,'<strong>Max. Entladeleistung</strong><br>Maximale Leistung mit der der Speicher entladen werden kann (kW). Limitiert wie schnell gespeicherte Energie abgerufen wird. Steht im Speicher-Datenblatt. Typisch: 1,0–3,0 kW.')">?</i></div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <input type="number" id="iBatDischargeW" min="0.1" max="20" step="0.1" value="1.5"
+                   style="width:70px;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);text-align:center;" />
+            <span style="font-size:12px;color:var(--muted);">kW</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;">
+        <div style="flex:1;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Roundtrip-Wirkungsgrad <i class="info-btn" onclick="showTip(this,'<strong>Roundtrip-Wirkungsgrad</strong><br>Verhältnis von entnommener zu eingespeicherter Energie. Bei 90%: von 1 kWh eingespeichert kommen 0,9 kWh wieder heraus (0,1 kWh Wärme). LFP-Akkus: ~95% · Li-NMC: ~90–92% · Blei-Säure: ~75–80%.')">?</i></div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <input type="number" id="iBatEff" min="70" max="99" step="1" value="90"
+                   style="width:55px;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);text-align:center;" />
+            <span style="font-size:12px;color:var(--muted);">%</span>
+          </div>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Min. SoC (Tiefentladeschutz) <i class="info-btn" onclick="showTip(this,'<strong>Minimaler Ladestand (SoC)</strong><br>Unter diesem Wert wird der Speicher nicht weiter entladen. Viele BMS erzwingen das bereits hardwareseitig. Typisch: 10–20%. LFP-Akkus vertragen tiefere Entladungen besser als NMC-Zellen.')">?</i></div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <input type="number" id="iBatMinSoc" min="0" max="30" step="1" value="10"
+                   style="width:55px;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);text-align:center;" />
+            <span style="font-size:12px;color:var(--muted);">%</span>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px;">
+        LFP-Akkus: ~95 % Roundtrip · Li-NMC: ~90–92 % · Blei: ~75–80 %
+      </p>
+    </div>
+  </div>
+
+  <div class="error" id="errBox"></div>
+
+  <button class="calc-btn" id="btnCalc" onclick="doCalc()">☀️ Prognose berechnen</button>
+
+  <p class="info-footer">
+    Strahlungsdaten: Open-Meteo (DNI, DHI, GHI, T₂ₘ · stündlich)<br>
+    Modell: POA nach Duffie &amp; Beckman · NOCT-Temperaturkorrektur · WR-Clipping<br>
+    Keine Registrierung · Keine API-Keys · Open Source
+  </p>
+</div>
+
+<!-- ══ FORECAST VIEW ════════════════════════════════════════════ -->
+<div id="vForecast">
+  <div class="back-row">
+    <button class="back-btn" onclick="showSetup()">← Zurück</button>
+    <div class="back-meta">
+      <h2 id="fTitle">—</h2>
+      <p id="fSub">—</p>
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric-card">
+      <div class="metric-label">7-Tage-Ertrag <i class="info-btn" onclick="showTip(this,'<strong>7-Tage-Ertrag</strong><br>Gesamte prognostizierte Solarproduktion der nächsten 7 Tage. Basiert auf stündlicher POA-Berechnung mit echten Wetterdaten, Temperatur- und WR-Clipping-Korrektur.')">?</i></div>
+      <div class="metric-value" id="m7d">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Ø pro Tag <i class="info-btn" onclick="showTip(this,'<strong>Tagesdurchschnitt</strong><br>7-Tage-Summe ÷ 7. Gut für Vergleiche mit Jahresertragsprognosen aus Planungstools (z.B. PVGIS).')">?</i></div>
+      <div class="metric-value" id="mAvg">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Bester Tag <i class="info-btn" onclick="showTip(this,'<strong>Bester Tag</strong><br>Tag mit der höchsten prognostizierten Produktion im 7-Tage-Fenster.')">?</i></div>
+      <div class="metric-value" id="mBest">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Max. AC-Leistung <i class="info-btn" onclick="showTip(this,'<strong>Max. AC-Leistung</strong><br>Deine eingestellte WR-Nennleistung. Höchste Leistung die der Wechselrichter ins Hausnetz liefern kann. Alles darüber wird abgeregelt (Clipping).')">?</i></div>
+      <div class="metric-value" id="mPeak">—</div>
+    </div>
+  </div>
+
+  <!-- Self-consumption metrics (shown only when consumption > 0) -->
+  <div id="mSelfBox" style="display:none;margin-bottom:16px;">
+    <p style="font-size:12px;color:var(--muted);font-weight:500;margin-bottom:8px;">Eigenverbrauch · 7 Tage</p>
+    <div class="metrics" style="margin-bottom:8px;">
+      <div class="metric-card" style="border-color:rgba(20,184,166,0.3);">
+        <div class="metric-label">Eigenverbrauch <i class="info-btn" onclick="showTip(this,'<strong>Eigenverbrauch</strong><br>Solarenergie die im Haushalt genutzt wird — direkt oder zeitversetzt über den Speicher. Ersetzt teuren Netzbezug und ist wirtschaftlich am wertvollsten.')">?</i></div>
+        <div class="metric-value" style="color:#14b8a6;" id="mSelf">—</div>
+      </div>
+      <div class="metric-card" style="border-color:rgba(20,184,166,0.3);">
+        <div class="metric-label">Autarkiegrad <i class="info-btn" onclick="showTip(this,'<strong>Autarkiegrad</strong><br>Anteil des Strombedarfs der durch Solar + Speicher gedeckt wird. 100% = kein Netzbezug nötig. Berechnet als: Eigenverbrauch ÷ Gesamtverbrauch × 100.')">?</i></div>
+        <div class="metric-value" style="color:#14b8a6;" id="mAuto">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Einspeisung <i class="info-btn" onclick="showTip(this,'<strong>Netzeinspeisung</strong><br>Überschuss der ins öffentliche Netz fließt, wenn Verbrauch und Speicher gesättigt sind. Balkonkraftwerk DE: aktuell keine Vergütung (0 ct/kWh), aber meldepflichtig im Marktstammdatenregister.')">?</i></div>
+        <div class="metric-value" id="mFeed">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Netzbezug <i class="info-btn" onclick="showTip(this,'<strong>Netzbezug</strong><br>Strom der weiterhin aus dem Netz bezogen werden muss. Netzbezug × Strompreis = verbleibende Stromkosten. Ziel: diesen Wert durch optimale Speichernutzung minimieren.')">?</i></div>
+        <div class="metric-value" id="mDraw">—</div>
+      </div>
+    </div>
+    <!-- Battery metrics (shown only when battery configured) -->
+    <div id="mBatBox" style="display:none;">
+      <p style="font-size:12px;color:var(--muted);font-weight:500;margin-bottom:8px;">🔋 Speicher · 7 Tage</p>
+      <div class="metrics" style="margin-bottom:0;">
+        <div class="metric-card" style="border-color:rgba(99,102,241,0.3);">
+          <div class="metric-label">Via Speicher genutzt <i class="info-btn" onclick="showTip(this,'<strong>Via Speicher genutzt</strong><br>Solarenergie die zunächst in den Akku geladen und später entladen wurde — nach Abzug der Roundtrip-Verluste. Zeigt wie aktiv der Speicher die Eigenversorgung verbessert.')">?</i></div>
+          <div class="metric-value" style="color:#818cf8;" id="mBatUsed">—</div>
+        </div>
+        <div class="metric-card" style="border-color:rgba(99,102,241,0.3);">
+          <div class="metric-label">Ø Ladestand abends <i class="info-btn" onclick="showTip(this,'<strong>Ø Ladestand abends</strong><br>Durchschnittlicher Akku-SoC am Ende jedes Tages (nach Sonnenuntergang). Zeigt wie gut der Speicher die Tagesproduktion für die Nacht puffert. Angabe in % der Gesamtkapazität inkl. min. SoC-Reserve.')">?</i></div>
+          <div class="metric-value" style="color:#818cf8;" id="mBatSoc">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Vollzyklen (7 Tage) <i class="info-btn" onclick="showTip(this,'<strong>Vollzyklen</strong><br>Entladene Gesamtenergie ÷ Nutzkapazität. Wichtig für Lebensdauerplanung: LFP-Akkus ~6000 Zyklen · NMC ~3000 Zyklen. Beispiel: 2,9 Zyklen/Woche = ~150 Zyklen/Jahr.')">?</i></div>
+          <div class="metric-value" id="mBatCycles">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Speicher-Verluste <i class="info-btn" onclick="showTip(this,'<strong>Speicher-Verluste</strong><br>Energie die beim Laden und Entladen als Wärme verloren geht. Bei 90% Roundtrip-Wirkungsgrad sind 10% jeder gespeicherten kWh Verlust. LFP-Akkus verlieren hier weniger (~5%).')">?</i></div>
+          <div class="metric-value" id="mBatLoss">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Temperature correction note -->
+  <div class="metric-card" id="mTempNote" style="margin-bottom:16px;display:none;">
+    <div class="metric-label">Temperaturkorrektur (Ø 7 Tage) <i class="info-btn" onclick="showTip(this,'<strong>Temperaturkorrektur</strong><br>Leistungsminderung durch Modulerwärmung. Zelltemperatur wird stündlich berechnet: T_Zelle = T_Luft + POA × (NOCT−20)/800. Verlust greift nur oberhalb von 25°C Zelltemperatur.')">?</i></div>
+    <div style="font-size:14px;font-weight:500;" id="mTempVal">—</div>
+  </div>
+
+  <!-- Battery recommendation -->
+  <div id="mRecoBox" style="display:none;margin-bottom:16px;">
+    <p style="font-size:12px;color:var(--muted);font-weight:500;margin-bottom:8px;">🔋 Speicher-Empfehlung</p>
+    <div id="mRecoContent" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-size:13px;line-height:1.75;color:var(--text);"></div>
+  </div>
+
+  <p style="font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:500;">
+    7-Tage-Prognose · Tipp: Tag antippen für Stundenverlauf
+  </p>
+
+  <div id="dayList"></div>
+
+  <div id="chartSection">
+    <div class="card">
+      <p class="chart-label" id="chartLbl">Stündlicher Verlauf</p>
+      <div id="chartLegend" style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:11px;color:var(--muted);"></div>
+      <div class="chart-wrap" style="height:220px;">
+        <canvas id="hourChart" role="img" aria-label="Stündlicher Solarertrag">Stündlicher Solarertrag</canvas>
+      </div>
+      <p class="chart-note" id="chartNote">
+        POA = DNI·cos(θ) + DHI·(1+cos β)/2 + GHI·ρ·(1–cos β)/2 · Einfallswinkel θ stündlich berechnet
+      </p>
+    </div>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<script>
+const DEG = Math.PI / 180;
+let selAz = 180;
+let fData = [];
+let chart = null;
+let gConsume = 0;
+let gBatCap = 0;
+let gBatMinSoc = 0;
+let gHourlyProd = []; // flat array of hourly produced kWh for all 7 days
+
+// ── Slider ↔ Number input sync ──────────────────────────────────
+function sR(rid, nid, oid, dec) {
+  const v = parseFloat(document.getElementById(rid).value);
+  if (isNaN(v)) return;
+  const n = document.getElementById(nid);
+  if (n) n.value = v.toFixed(dec);
+  if (oid) { const o = document.getElementById(oid); if (o) o.textContent = v.toFixed(dec); }
+}
+// oninput: only move the slider while typing — no value rewrite (avoids cursor jump)
+function sNi(nid, rid) {
+  const raw = parseFloat(document.getElementById(nid).value);
+  if (!isNaN(raw)) { const r = document.getElementById(rid); if (r) r.value = raw; }
+}
+// onchange / onblur: clamp, format, update display
+function sNc(nid, rid, oid, dec) {
+  const el = document.getElementById(nid);
+  if (!el) return;
+  let v = parseFloat(el.value);
+  if (isNaN(v)) { const r = document.getElementById(rid); v = parseFloat(r ? r.value : 0) || 0; }
+  const mn = parseFloat(el.getAttribute('min'));
+  const mx = parseFloat(el.getAttribute('max'));
+  v = Math.min(isNaN(mx) ? 1e9 : mx, Math.max(isNaN(mn) ? 0 : mn, v));
+  el.value = v.toFixed(dec);
+  const r = document.getElementById(rid); if (r) r.value = v;
+  if (oid) { const o = document.getElementById(oid); if (o) o.textContent = v.toFixed(dec); }
+}
+
+const AZ_NAMES = {0:'Nord',45:'Nordost',90:'Ost',135:'Südost',180:'Süd',225:'Südwest',270:'West',315:'Nordwest'};
+
+// ── Solar math ──────────────────────────────────────────────────
+function dayOfYear(ds) {
+  const d = new Date(ds + 'T12:00:00');
+  return Math.floor((d - new Date(d.getFullYear(), 0, 1)) / 86400000) + 1;
+}
+
+function cosAOI(lat, lon, tilt, azDeg, ds, hour) {
+  const doy = dayOfYear(ds);
+  const decl = 23.45 * Math.sin(DEG * (360 / 365 * (doy - 81)));
+  const B = DEG * (360 / 365 * (doy - 81));
+  const eot = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
+  const omega = (hour - (12 - lon / 15 - eot / 60)) * 15;
+  const phi = lat * DEG, delta = decl * DEG, w = omega * DEG;
+  const beta = tilt * DEG, gamma = (azDeg - 180) * DEG;
+  const cosZ = Math.sin(phi)*Math.sin(delta) + Math.cos(phi)*Math.cos(delta)*Math.cos(w);
+  if (cosZ <= 0) return 0;
+  return Math.max(0,
+    Math.sin(delta)*Math.sin(phi)*Math.cos(beta)
+    - Math.sin(delta)*Math.cos(phi)*Math.sin(beta)*Math.cos(gamma)
+    + Math.cos(delta)*Math.cos(phi)*Math.cos(beta)*Math.cos(w)
+    + Math.cos(delta)*Math.sin(phi)*Math.sin(beta)*Math.cos(gamma)*Math.cos(w)
+    + Math.cos(delta)*Math.sin(beta)*Math.sin(gamma)*Math.sin(w)
+  );
+}
+
+// ── Clear-sky POA (Hottel model, no clouds) ─────────────────────
+function clearSkyPOA(lat, lon, tilt, azDeg, ds, hour) {
+  const doy = dayOfYear(ds);
+  const decl = 23.45 * Math.sin(DEG * (360/365*(doy-81)));
+  const B = DEG * (360/365*(doy-81));
+  const eot = 9.87*Math.sin(2*B) - 7.53*Math.cos(B) - 1.5*Math.sin(B);
+  const omega = (hour - (12 - lon/15 - eot/60)) * 15;
+  const phi = lat*DEG, delta = decl*DEG, w = omega*DEG;
+  const cosZ = Math.sin(phi)*Math.sin(delta) + Math.cos(phi)*Math.cos(delta)*Math.cos(w);
+  if (cosZ <= 0.01) return 0;
+  // Hottel: atmospheric transmittance for clear conditions (tau ≈ 0.72)
+  const I0 = 1367;
+  const DNI_cs = I0 * Math.pow(0.72, 1 / cosZ);
+  const GHI_cs = DNI_cs * cosZ;
+  const DHI_cs = 0.1 * GHI_cs;
+  const beta = tilt * DEG;
+  const ci = cosAOI(lat, lon, tilt, azDeg, ds, hour);
+  return Math.max(0, DNI_cs*ci + DHI_cs*(1+Math.cos(beta))/2 + GHI_cs*0.2*(1-Math.cos(beta))/2);
+}
+function setAz(d) {
+  d = Math.max(0, Math.min(359, Math.round(d)));
+  selAz = d;
+  // highlight nearest compass button
+  const nearest = [0,45,90,135,180,225,270,315].reduce((a,b) => {
+    const da = Math.min(Math.abs(d-a), 360-Math.abs(d-a));
+    const db = Math.min(Math.abs(d-b), 360-Math.abs(d-b));
+    return da <= db ? a : b;
+  });
+  document.querySelectorAll('.az-btn').forEach(b => b.classList.toggle('active', +b.dataset.d === nearest));
+  document.getElementById('oAzName').textContent = AZ_NAMES[d] || (d + '°');
+  // sync slider + number input without re-triggering
+  const slider = document.getElementById('iAzSlider');
+  const numIn  = document.getElementById('iAzDeg');
+  if (slider && +slider.value !== d) slider.value = d;
+  if (numIn  && +numIn.value  !== d) numIn.value  = d;
+}
+
+function setAzFromInput(v) {
+  if (isNaN(v)) return;
+  setAz(v);
+}
+
+function setTilt(v, btn) {
+  document.getElementById('iTilt').value = v;
+  document.getElementById('nTilt').value = v;
+  document.getElementById('oTilt').textContent = v;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+async function doGps() {
+  if (!navigator.geolocation) return;
+  const btn = document.getElementById('btnGps');
+  btn.textContent = '…';
+  navigator.geolocation.getCurrentPosition(async ({ coords: { latitude: lat, longitude: lon } }) => {
+    document.getElementById('iLat').value = lat.toFixed(4);
+    document.getElementById('iLon').value = lon.toFixed(4);
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+      const j = await r.json();
+      document.getElementById('iLocName').value =
+        j.address?.city || j.address?.town || j.address?.village || `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+    } catch {}
+    btn.textContent = 'GPS';
+  }, () => { btn.textContent = 'GPS'; });
+}
+
+const DN = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+const MN = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+
+function fmtDate(ds) {
+  const d = new Date(ds + 'T12:00:00');
+  return `${DN[d.getDay()]}, ${d.getDate()}. ${MN[d.getMonth()]}`;
+}
+
+function cloudText(p) {
+  if (p < 15) return 'Sonnig';
+  if (p < 35) return 'Leicht bewölkt';
+  if (p < 60) return 'Bewölkt';
+  if (p < 85) return 'Stark bewölkt';
+  return 'Bedeckt';
+}
+
+function kwhColor(ratio) {
+  if (ratio > 0.70) return '#f59e0b';
+  if (ratio > 0.35) return '#fb923c';
+  return '#64748b';
+}
+
+// ── Main calculation ────────────────────────────────────────────
+async function doCalc() {
+  const lat          = +document.getElementById('iLat').value;
+  const lon          = +document.getElementById('iLon').value;
+  const kwp          = +document.getElementById('iKwp').value;
+  const tilt         = +document.getElementById('iTilt').value;
+  const eff          = +document.getElementById('iEff').value;
+  const wrMax        = +document.getElementById('iWr').value;
+  const tc           = +document.getElementById('iTc').value;
+  const consume      = +document.getElementById('iConsume').value;
+  const batCap       = +document.getElementById('iBat').value;
+  const batChargeW   = +document.getElementById('iBatChargeW').value;
+  const batDischargeW= +document.getElementById('iBatDischargeW').value;
+  const batEff       = +document.getElementById('iBatEff').value / 100;   // roundtrip e.g. 0.90
+  const batMinSoc    = +document.getElementById('iBatMinSoc').value / 100;
+  const loc          = document.getElementById('iLocName').value || `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+
+  const NOCT       = 45;
+  const hourCons   = consume / 24;
+  const batUsable  = batCap * (1 - batMinSoc);
+  const sqrtEff    = Math.sqrt(batEff);
+  gConsume = consume;
+  gBatCap  = batCap;
+  gBatMinSoc = batMinSoc;
+
+  const errBox = document.getElementById('errBox');
+  errBox.style.display = 'none';
+  const btn = document.getElementById('btnCalc');
+  btn.disabled = true;
+  btn.textContent = '⏳ Lade Wetterdaten…';
+
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `&hourly=shortwave_radiation,direct_normal_irradiance,diffuse_radiation,cloudcover,temperature_2m` +
+      `&timezone=auto&forecast_days=7`;
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const j = await res.json();
+
+    const { time: T, shortwave_radiation: GHI, direct_normal_irradiance: DNI,
+            diffuse_radiation: DHI, cloudcover: CC, temperature_2m: TEMP } = j.hourly;
+
+    const beta = tilt * DEG;
+    const days = {};
+    let totalTempLoss = 0, totalKwhBeforeTemp = 0;
+
+    // Battery state persists across the entire 7-day simulation
+    let batSoC = batUsable * 0.5; // start at 50%
+    let totalBatCharged = 0, totalBatDischarged = 0, totalBatLoss = 0;
+    gHourlyProd = []; // reset
+
+    T.forEach((t, i) => {
+      const ds   = t.slice(0, 10);
+      const hour = +t.slice(11, 13) + 0.5;
+      if (!days[ds]) days[ds] = { hs: [], ccSum: 0, socEnd: 0 };
+
+      // ── POA irradiance ──
+      const ci  = cosAOI(lat, lon, tilt, selAz, ds, hour);
+      const poa = Math.max(0,
+        (DNI[i]  || 0) * ci +
+        (DHI[i]  || 0) * (1 + Math.cos(beta)) / 2 +
+        (GHI[i]  || 0) * 0.2 * (1 - Math.cos(beta)) / 2
+      );
+
+      // ── Temperature correction ──
+      const p_dc_raw = poa * kwp * eff / 100 / 1000;
+      const t_air    = TEMP[i] ?? 20;
+      const t_cell   = t_air + poa * (NOCT - 20) / 800;
+      const tempFact = 1 - (tc / 100) * Math.max(0, t_cell - 25);
+      const p_dc     = p_dc_raw * tempFact;
+
+      if (p_dc_raw > 0) { totalKwhBeforeTemp += p_dc_raw; totalTempLoss += p_dc_raw - p_dc; }
+
+      // ── WR clipping ──
+      const produced = Math.min(p_dc, wrMax);
+      gHourlyProd.push(produced);
+
+      // ── Clear-sky reference (uncapped) ──
+      const poa_cs = clearSkyPOA(lat, lon, tilt, selAz, ds, hour);
+      const cs_kwh = poa_cs * kwp * eff / 100 / 1000; // kWh this hour
+
+      let selfDirect = 0, batCharge = 0, batDischarge = 0, feedIn = 0, gridDraw = 0;
+      let batLossHour = 0;
+
+      if (consume > 0) {
+        // ── Energy balance with battery ──
+        let surplus = produced - hourCons;
+
+        if (surplus >= 0) {
+          // More production than consumption → direct self-use + charge battery
+          selfDirect = hourCons;
+          if (batCap > 0 && batSoC < batUsable) {
+            const space     = batUsable - batSoC;
+            const canCharge = Math.min(surplus, batChargeW, space / sqrtEff);
+            const stored    = canCharge * sqrtEff;   // after charge loss
+            batSoC         += stored;
+            batCharge       = canCharge;
+            batLossHour    += canCharge - stored;
+            totalBatCharged += stored;
+            surplus        -= canCharge;
+          }
+          feedIn = Math.max(0, surplus);
+        } else {
+          // More consumption than production → use what's produced + discharge battery
+          selfDirect = produced;
+          let deficit = -surplus;
+          if (batCap > 0 && batSoC > 0) {
+            const avail       = Math.min(batSoC, batDischargeW, deficit / sqrtEff);
+            const delivered   = avail * sqrtEff;    // after discharge loss
+            batSoC           -= avail;
+            batDischarge      = delivered;
+            batLossHour      += avail - delivered;
+            totalBatDischarged+= delivered;
+            deficit          -= delivered;
+          }
+          gridDraw = Math.max(0, deficit);
+        }
+        totalBatLoss += batLossHour;
+      } else {
+        feedIn = produced;
+      }
+
+      days[ds].hs.push({
+        h:           +t.slice(11, 13),
+        kwh:         +produced.toFixed(3),   // after WR clipping (energy balance)
+        kwhNc:       +p_dc.toFixed(3),        // before WR clipping (chart display)
+        cs:          +cs_kwh.toFixed(3),
+        poa:         Math.round(poa),
+        tCell:       +t_cell.toFixed(1),
+        tempFact:    +tempFact.toFixed(3),
+        selfDirect:  +selfDirect.toFixed(3),
+        batCharge:   +batCharge.toFixed(3),
+        batDischarge:+batDischarge.toFixed(3),
+        feedIn:      +feedIn.toFixed(3),
+        gridDraw:    +gridDraw.toFixed(3),
+        soc:         batCap > 0 ? Math.round((batMinSoc * batCap + batSoC) / batCap * 100) : 0
+      });
+      days[ds].ccSum   += (CC[i] || 0);
+      days[ds].socEnd   = batCap > 0 ? Math.round((batMinSoc * batCap + batSoC) / batCap * 100) : 0;
+    });
+
+    fData = Object.entries(days).map(([ds, d]) => {
+      const totalSelfConsDay = d.hs.reduce((s, h) => s + h.selfDirect + h.batDischarge, 0);
+      return {
+        ds,
+        kwh:      +d.hs.reduce((s, h) => s + h.kwh, 0).toFixed(2),
+        cloud:    Math.round(d.ccSum / d.hs.length),
+        selfCons: +totalSelfConsDay.toFixed(2),
+        feedIn:   +d.hs.reduce((s, h) => s + h.feedIn, 0).toFixed(2),
+        gridDraw: +d.hs.reduce((s, h) => s + h.gridDraw, 0).toFixed(2),
+        socEnd:   d.socEnd,
+        hs:       d.hs.filter(h => h.cs > 0.01 || h.kwh > 0.001)
+      };
+    });
+
+    // ── Summary metrics ──
+    const total          = fData.reduce((s, d) => s + d.kwh, 0);
+    const maxK           = Math.max(...fData.map(d => d.kwh), 0.1);
+    const best           = fData.reduce((a, b) => a.kwh > b.kwh ? a : b);
+    const totalSelf      = fData.reduce((s, d) => s + d.selfCons, 0);
+    const totalFeed      = fData.reduce((s, d) => s + d.feedIn, 0);
+    const totalDraw      = fData.reduce((s, d) => s + d.gridDraw, 0);
+    const totalConsumeWk = consume * fData.length;
+    const autarky        = totalConsumeWk > 0 ? Math.round(totalSelf / totalConsumeWk * 100) : 0;
+    const avgSocEvening  = fData.length > 0
+      ? Math.round(fData.reduce((s, d) => s + d.socEnd, 0) / fData.length) : 0;
+    const cycles         = batUsable > 0 ? +(totalBatDischarged / batUsable).toFixed(1) : 0;
+    const tempLossPct    = totalKwhBeforeTemp > 0
+      ? ((totalTempLoss / totalKwhBeforeTemp) * 100).toFixed(1) : '0.0';
+
+    document.getElementById('m7d').textContent   = total.toFixed(1) + ' kWh';
+    document.getElementById('mAvg').textContent  = (total / fData.length).toFixed(1) + ' kWh';
+    document.getElementById('mBest').textContent = best.kwh.toFixed(1) + ' kWh';
+    document.getElementById('mPeak').textContent = wrMax.toFixed(1) + ' kW';
+    document.getElementById('fTitle').textContent = loc;
+    document.getElementById('fSub').textContent   =
+      `${kwp} kWp · ${AZ_NAMES[selAz] || selAz + '°'} · ${tilt}° · WR ${wrMax} kW` +
+      (batCap > 0 ? ` · 🔋 ${batCap} kWh` : '');
+
+    document.getElementById('mTempNote').style.display = 'block';
+    document.getElementById('mTempVal').textContent =
+      `–${tempLossPct}% durch Modulerwärmung (NOCT ${NOCT}°C · γ = –${tc}%/°C)`;
+
+    if (consume > 0) {
+      document.getElementById('mSelfBox').style.display = 'block';
+      document.getElementById('mSelf').textContent = totalSelf.toFixed(1) + ' kWh';
+      document.getElementById('mAuto').textContent = autarky + '%';
+      document.getElementById('mFeed').textContent = totalFeed.toFixed(1) + ' kWh';
+      document.getElementById('mDraw').textContent = totalDraw.toFixed(1) + ' kWh';
+
+      if (batCap > 0) {
+        document.getElementById('mBatBox').style.display = 'block';
+        document.getElementById('mBatUsed').textContent  = totalBatDischarged.toFixed(1) + ' kWh';
+        document.getElementById('mBatSoc').textContent   = avgSocEvening + '%';
+        document.getElementById('mBatCycles').textContent= cycles;
+        document.getElementById('mBatLoss').textContent  = totalBatLoss.toFixed(1) + ' kWh';
+      } else {
+        document.getElementById('mBatBox').style.display = 'none';
+      }
+    } else {
+      document.getElementById('mSelfBox').style.display = 'none';
+    }
+
+    // ── Day cards ──
+    const dayList = document.getElementById('dayList');
+    dayList.innerHTML = '';
+    fData.forEach((d, i) => {
+      const ratio   = d.kwh / maxK;
+      const col     = kwhColor(ratio);
+      const selfPct = d.kwh > 0 && consume > 0 ? Math.round(d.selfCons / d.kwh * 100) : 0;
+      const el = document.createElement('div');
+      el.className = 'day-card';
+      el.innerHTML = `
+        <div class="day-top">
+          <div>
+            <div class="day-date">${fmtDate(d.ds)}</div>
+            <div class="day-cloud">${cloudText(d.cloud)} · ${d.cloud}%${
+              consume > 0 ? ` · EV ${selfPct}%` : ''}${
+              batCap > 0 && consume > 0 ? ` · 🔋 ${d.socEnd}%` : ''}</div>
+          </div>
+          <div>
+            <div class="day-kwh" style="color:${col};">${d.kwh.toFixed(2)}</div>
+            <div class="day-kwh-unit">kWh</div>
+          </div>
+        </div>
+        <div class="day-bar-track">
+          <div class="day-bar-fill" style="width:${Math.round(ratio*100)}%;background:${col};position:relative;">
+            ${consume > 0 && selfPct > 0
+              ? `<div style="position:absolute;left:0;top:0;height:100%;width:${selfPct}%;background:#14b8a6;border-radius:2px;"></div>`
+              : ''}
+          </div>
+        </div>
+        ${consume > 0 ? `
+        <div style="display:flex;gap:10px;margin-top:8px;font-size:11px;color:var(--muted);flex-wrap:wrap;">
+          <span style="color:#14b8a6;">&#9632; ${d.selfCons.toFixed(2)} kWh EV</span>
+          <span>&#9632; ${d.feedIn.toFixed(2)} kWh Einsp.</span>
+          <span>&#9632; ${d.gridDraw.toFixed(2)} kWh Bezug</span>
+        </div>` : ''}`;
+      el.addEventListener('click', () => selectDay(i));
+      dayList.appendChild(el);
+    });
+
+    document.getElementById('vSetup').style.display = 'none';
+    document.getElementById('vForecast').style.display = 'block';
+    calcBatReco();
+    selectDay(0);
+
+  } catch (e) {
+    let msg = 'Fehler: ' + e.message;
+    if (e.message === 'Failed to fetch' || e.message.includes('fetch')) {
+      msg = 'Verbindung zu Open-Meteo fehlgeschlagen.\n\n'
+          + 'Mögliche Ursachen:\n'
+          + '• Kein Internet\n'
+          + '• Browser blockiert externe Anfragen (z.B. Brave-Shields, uBlock)\n'
+          + '• Datei über file:// geöffnet + Chrome-Sicherheitseinstellung\n\n'
+          + 'Lösung: Datei in Firefox öffnen, oder Chrome mit --allow-file-access-from-files starten.';
+    }
+    errBox.style.whiteSpace = 'pre-line';
+    errBox.textContent = msg;
+    errBox.style.display = 'block';
+  }
+
+  btn.disabled = false;
+  btn.textContent = '☀️ Prognose berechnen';
+}
+
+// ── Battery sizing recommendation ──────────────────────────────
+function calcBatReco() {
+  const box = document.getElementById('mRecoBox');
+  if (!gHourlyProd.length) { box.style.display = 'none'; return; }
+  if (gConsume === 0) {
+    document.getElementById('mRecoContent').innerHTML =
+      '<span style="color:var(--muted);">Tagesverbrauch eingeben um die Speicher-Empfehlung zu aktivieren.</span>';
+    box.style.display = 'block';
+    return;
+  }
+
+  const hourCons    = gConsume / 24;
+  const chargeW     = +document.getElementById('iBatChargeW').value;
+  const dischargeW  = +document.getElementById('iBatDischargeW').value;
+  const batEff      = +document.getElementById('iBatEff').value / 100;
+  const minSoc      = gBatMinSoc;
+  const sqrtEff     = Math.sqrt(batEff);
+  const totalDemand = hourCons * gHourlyProd.length;
+  const currentCap  = gBatCap;
+  const priceKwh    = 0.30; // €/kWh — German avg assumption
+  const batPriceKwh = 250;  // €/kWh installed for LFP expansion
+
+  function simCap(cap) {
+    const usable = cap * (1 - minSoc);
+    let soc = usable * 0.5, self = 0, draw = 0;
+    gHourlyProd.forEach(function(prod) {
+      const surplus = prod - hourCons;
+      if (surplus >= 0) {
+        self += hourCons;
+        if (cap > 0) {
+          const ch = Math.min(surplus, chargeW, Math.max(0, usable - soc) / sqrtEff);
+          soc = Math.min(usable, soc + ch * sqrtEff);
+        }
+      } else {
+        self += prod;
+        if (cap > 0 && soc > 0) {
+          const av  = Math.min(soc, dischargeW, (-surplus) / sqrtEff);
+          const del = av * sqrtEff;
+          soc -= av;
+          const extra = Math.min(del, -surplus);
+          self += extra;
+          draw += Math.max(0, -surplus - extra);
+        } else {
+          draw += -surplus;
+        }
+      }
+    });
+    return {
+      autarky: Math.round(Math.min(self, totalDemand) / totalDemand * 100),
+      weekDraw: +draw.toFixed(1)
+    };
+  }
+
+  // Simulate 0 → max(currentCap*3, 20) in 0.5 kWh steps
+  const maxCap = Math.min(30, Math.max(currentCap * 3, currentCap + 12));
+  const step = 0.5;
+  const results = [];
+  for (let c = 0; c <= maxCap + 0.01; c += step) {
+    results.push({ cap: +c.toFixed(1), ...simCap(c) });
+  }
+
+  const noBat  = results[0];
+  const cur    = results.find(r => Math.abs(r.cap - currentCap) < 0.3) || results[results.length - 1];
+
+  // Marginal autarky gain per kWh from current size onward
+  // Find "knee": first cap where marginal gain < 2.5% per kWh (= 1.25% per 0.5 kWh step)
+  let kneeIdx = results.findIndex(function(r, i) {
+    if (r.cap <= currentCap || i < 2) return false;
+    const prev = results[i - 1];
+    return (r.autarky - prev.autarky) / step < 2.5;
+  });
+  if (kneeIdx === -1) kneeIdx = results.length - 1;
+  const opt = results[kneeIdx];
+
+  const addCap  = +(opt.cap - currentCap).toFixed(1);
+  const autGain = opt.autarky - cur.autarky;
+  const drawSaved = +(cur.weekDraw - opt.weekDraw).toFixed(1);
+  const annualSaved = +(drawSaved * 52 * priceKwh).toFixed(0);
+  const addCost = +(addCap * batPriceKwh).toFixed(0);
+  const payback = annualSaved > 0 ? +(addCost / annualSaved).toFixed(1) : '∞';
+
+  // Build a mini table for 4 key sizes
+  const keyCapsList = [0, currentCap];
+  const step2 = currentCap >= 8 ? 4 : 2;
+  for (let c = currentCap + step2; c <= maxCap && keyCapsList.length < 6; c += step2) {
+    keyCapsList.push(+c.toFixed(1));
+  }
+  if (!keyCapsList.includes(opt.cap) && opt.cap > currentCap) keyCapsList.push(opt.cap);
+  keyCapsList.sort((a, b) => a - b);
+
+  const rows = keyCapsList.map(function(cap) {
+    const r = results.find(x => Math.abs(x.cap - cap) < 0.3);
+    if (!r) return '';
+    const isCurrent = Math.abs(cap - currentCap) < 0.3;
+    const isOpt = Math.abs(cap - opt.cap) < 0.3 && opt.cap > currentCap;
+    const highlight = isCurrent ? 'color:#f59e0b;' : isOpt ? 'color:#14b8a6;' : '';
+    const tag = isCurrent ? ' ← aktuell' : isOpt ? ' ← optimal' : '';
+    return '<tr>' +
+      '<td style="padding:4px 8px 4px 0;' + highlight + 'font-weight:' + (isCurrent || isOpt ? '600' : '400') + ';">' + cap.toFixed(1) + ' kWh' + tag + '</td>' +
+      '<td style="padding:4px 8px;' + highlight + '">' + r.autarky + '%</td>' +
+      '<td style="padding:4px 0;color:var(--muted);">' + r.weekDraw.toFixed(1) + ' kWh/W</td>' +
+    '</tr>';
+  }).join('');
+
+  let reco;
+  if (currentCap === 0) {
+    reco = 'Ohne Speicher liegt der Autarkiegrad bei <strong>' + noBat.autarky + '%</strong>. Ein Speicher würde die Eigenversorgung deutlich verbessern.';
+  } else if (addCap <= 0.4) {
+    reco = '✅ Deine <strong>' + currentCap + ' kWh</strong> sind bereits nah am optimalen Punkt. Eine Vergrößerung bringt kaum noch Mehrwert.';
+  } else if (autGain >= 8) {
+    reco = '📈 Eine Erweiterung auf <strong>' + opt.cap + ' kWh</strong> (+' + addCap + ' kWh) würde den Autarkiegrad von ' + cur.autarky + '% auf <strong>' + opt.autarky + '%</strong> steigern (+' + autGain + '%). ' +
+      'Das spart ca. <strong>' + drawSaved + ' kWh/Woche</strong> Netzbezug — bei 30 ct/kWh ~<strong>' + annualSaved + ' €/Jahr</strong>. ' +
+      'Kosten für die Erweiterung (Schätzung ~250 €/kWh): ca. <strong>' + addCost + ' €</strong> → Amortisation ~<strong>' + payback + ' Jahre</strong>.';
+  } else {
+    reco = '⚖️ Eine Erweiterung auf <strong>' + opt.cap + ' kWh</strong> brächte noch <strong>+' + autGain + '%</strong> Autarkie (+' + addCap + ' kWh). ' +
+      'Der Grenznutzen ist aber gering. Lohnt sich nur bei sehr langem Zeithorizont oder günstigem Speicherpreis.';
+  }
+
+  document.getElementById('mRecoContent').innerHTML =
+    '<table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:12px;">' +
+    '<tr style="color:var(--muted);font-size:11px;border-bottom:1px solid var(--border);">' +
+    '<th style="text-align:left;padding-bottom:4px;">Kapazität</th>' +
+    '<th style="text-align:left;padding-bottom:4px;">Autarkie</th>' +
+    '<th style="text-align:left;padding-bottom:4px;">Netzbezug</th></tr>' +
+    rows + '</table>' + reco +
+    '<p style="font-size:11px;color:var(--muted);margin-top:8px;">Strompreis: 30 ct/kWh · Speicherpreis: ~250 €/kWh (Schätzwert) · Vereinfachtes Lastprofil</p>';
+
+  box.style.display = 'block';
+}
+
+// ── Day selection + chart ───────────────────────────────────────
+function selectDay(idx) {
+  const d = fData[idx];
+  if (!d || !d.hs.length) return;
+
+  document.querySelectorAll('.day-card').forEach((c, i) => {
+    c.classList.toggle('selected', i === idx);
+  });
+
+  const sec = document.getElementById('chartSection');
+  sec.style.display = 'block';
+  document.getElementById('chartLbl').textContent =
+    fmtDate(d.ds) + '  ·  ' + d.kwh.toFixed(2) + ' kWh Prognose';
+
+  if (chart) { chart.destroy(); chart = null; }
+
+  const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const gc = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const tc = isDark ? 'rgba(255,255,255,0.40)' : 'rgba(0,0,0,0.40)';
+
+  const labels   = d.hs.map(h => h.h + ':00');
+  const forecast = d.hs.map(h => +h.kwhNc.toFixed(3));   // uncapped: module potential
+  const clearSky = d.hs.map(h => +h.cs.toFixed(3));
+  const upper    = d.hs.map((h, i) => +Math.min(h.kwhNc * 1.20, clearSky[i] * 0.98).toFixed(3));
+  const lower    = d.hs.map(h => +Math.max(h.kwhNc * 0.80, 0).toFixed(3));
+  const hourCons = gConsume > 0 ? +(gConsume / 24).toFixed(3) : 0;
+
+  const datasets = [
+    // ① Band upper edge (fills down to lower)
+    {
+      type: 'line', label: '_upper',
+      data: upper,
+      fill: '+1',
+      backgroundColor: 'rgba(245,158,11,0.15)',
+      borderColor: 'transparent',
+      pointRadius: 0, tension: 0.4, order: 4
+    },
+    // ② Band lower edge
+    {
+      type: 'line', label: '_lower',
+      data: lower,
+      fill: false,
+      borderColor: 'transparent',
+      pointRadius: 0, tension: 0.4, order: 4
+    },
+    // ③ Forecast center line (amber solid)
+    {
+      type: 'line', label: 'Prognose',
+      data: forecast,
+      borderColor: '#f59e0b',
+      borderWidth: 2.5,
+      pointRadius: 0,
+      tension: 0.4,
+      fill: false, order: 2
+    },
+    // ④ Clear sky max (blue dotted with dots)
+    {
+      type: 'line', label: 'Klarer Himmel (max)',
+      data: clearSky,
+      borderColor: '#93c5fd',
+      backgroundColor: '#93c5fd',
+      borderWidth: 1.5,
+      borderDash: [5, 4],
+      pointRadius: 3,
+      pointStyle: 'circle',
+      tension: 0.4,
+      fill: false, order: 1
+    }
+  ];
+
+  // ⑤ Consumption line
+  if (gConsume > 0) {
+    datasets.push({
+      type: 'line', label: 'Ø Verbrauch/Stunde',
+      data: d.hs.map(() => hourCons),
+      borderColor: '#14b8a6',
+      borderWidth: 1.5,
+      borderDash: [4, 3],
+      pointRadius: 0, tension: 0,
+      fill: false, order: 2
+    });
+  }
+
+  // ── Custom legend ──
+  const legDefs = [
+    { color: '#93c5fd', dash: true,  label: 'Klarer Himmel (theoret. Max.)' },
+    { color: '#f59e0b', dash: false, label: 'Prognose (POA + Wetterdaten)' },
+    { color: 'rgba(245,158,11,0.35)', dash: false, label: 'Prognoseband ±20%', square: true }
+  ];
+  if (gConsume > 0) legDefs.push({ color: '#14b8a6', dash: true, label: 'Ø Verbrauch/Stunde' });
+
+  document.getElementById('chartLegend').innerHTML = legDefs.map(function(it) {
+    if (it.square) {
+      return '<span style="display:flex;align-items:center;gap:5px;">' +
+        '<span style="width:18px;height:10px;border-radius:2px;background:' + it.color + ';flex-shrink:0;"></span>' +
+        it.label + '</span>';
+    }
+    const border = it.dash
+      ? 'border-bottom: 2px dashed ' + it.color + ';background:transparent;'
+      : 'background:' + it.color + ';';
+    return '<span style="display:flex;align-items:center;gap:5px;">' +
+      '<span style="width:18px;height:3px;' + border + 'flex-shrink:0;"></span>' +
+      it.label + '</span>';
+  }).join('');
+
+  document.getElementById('chartNote').textContent =
+    'Prognoseband ±20% · Klarer Himmel: Hottel-Modell (τ=0,72) · Prognose: Open-Meteo DNI/DHI + Einfallswinkelkorrektur';
+
+  chart = new Chart(document.getElementById('hourChart').getContext('2d'), {
+    type: 'line',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#111827',
+          borderColor: '#1e2d45',
+          borderWidth: 1,
+          filter: function(item) { return !item.dataset.label.startsWith('_'); },
+          callbacks: {
+            title: function(ts) { return ts[0].label + ' Uhr'; },
+            label: function(ctx) {
+              if (ctx.raw === 0) return null;
+              return '  ' + ctx.dataset.label + ': ' + (+ctx.raw).toFixed(3) + ' kWh';
+            },
+            afterBody: function(ts) {
+              const h = d.hs[ts[0].dataIndex];
+              if (!h) return [];
+              const lines = [];
+              const surplus = h.kwh - hourCons;
+              if (gConsume > 0) {
+                lines.push(surplus >= 0
+                  ? '  Überschuss: +' + surplus.toFixed(3) + ' kWh'
+                  : '  Lücke: ' + surplus.toFixed(3) + ' kWh');
+              }
+              if (h.selfDirect > 0.001)   lines.push('  Direktverbr.: '   + h.selfDirect.toFixed(3) + ' kWh');
+              if (h.batCharge > 0.001)    lines.push('  Speicher lädt: '  + h.batCharge.toFixed(3) + ' kWh');
+              if (h.batDischarge > 0.001) lines.push('  Speicher entl.: ' + h.batDischarge.toFixed(3) + ' kWh');
+              if (h.feedIn > 0.001)       lines.push('  Netzeinsp.: '     + h.feedIn.toFixed(3) + ' kWh');
+              if (h.gridDraw > 0.001)     lines.push('  Netzbezug: '      + h.gridDraw.toFixed(3) + ' kWh');
+              if (h.soc !== undefined)    lines.push('  SoC Speicher: '   + h.soc + '%');
+              lines.push('  Zelltemp: ' + h.tCell.toFixed(1) + '°C · POA: ' + h.poa + ' W/m²');
+              return lines;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: tc, font: { size: 10 }, maxRotation: 0 },
+          grid: { color: gc }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: tc, font: { size: 10 }, callback: function(v) { return v.toFixed(2); } },
+          grid: { color: gc }
+        }
+      }
+    }
+  });
+
+  sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function showSetup() {
+  document.getElementById('vForecast').style.display = 'none';
+  document.getElementById('vSetup').style.display = 'block';
+  if (chart) { chart.destroy(); chart = null; }
+}
+
+setAz(180);
+</script>
+
+<div id="tipBox"></div>
+
+<script>
+function showTip(btn, text) {
+  const box = document.getElementById('tipBox');
+  if (box._src === btn && box.style.display === 'block') {
+    box.style.display = 'none'; box._src = null; return;
+  }
+  box.innerHTML = text;
+  box.style.display = 'block';
+  box._src = btn;
+  const r = btn.getBoundingClientRect();
+  const bw = Math.min(300, window.innerWidth - 32);
+  let left = r.left;
+  if (left + bw > window.innerWidth - 8) left = window.innerWidth - bw - 8;
+  left = Math.max(8, left);
+  let top = r.bottom + 8;
+  if (top + 120 > window.innerHeight) top = r.top - 130;
+  box.style.left = left + 'px';
+  box.style.top = top + 'px';
+  box.style.width = bw + 'px';
+}
+document.addEventListener('click', function(e) {
+  if (!e.target.classList.contains('info-btn')) {
+    const box = document.getElementById('tipBox');
+    box.style.display = 'none'; box._src = null;
+  }
+});
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(function(){});
+}
+</script>
+</body>
+</html>

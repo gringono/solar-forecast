@@ -2,7 +2,7 @@
   "name": "Solar Forecast",
   "short_name": "Solar",
   "description": "PV-Ertragsvorhersage \u2013 entwickelt von Melting Hero",
-  "start_url": "index.html",
+  "start_url": "./index.html",
   "scope": ".",
   "display": "standalone",
   "orientation": "portrait",
