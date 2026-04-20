@@ -1487,7 +1487,7 @@ function selectDay(idx) {
   const labels   = d.hs.map(h => h.h + ':00');
   const forecast = d.hs.map(h => +h.kwhNc.toFixed(3));
   const clearSky = d.hs.map(h => +h.cs.toFixed(3));
-  const upper    = d.hs.map((h, i) => +Math.min(h.kwhNc * 1.20, clearSky[i] * 0.98).toFixed(3));
+  const upper    = d.hs.map(h => +Math.max(h.kwhNc * 1.20, 0).toFixed(3));
   const lower    = d.hs.map(h => +Math.max(h.kwhNc * 0.80, 0).toFixed(3));
   // Build block-aware hourly consumption line
   const loadSum = BLOCKS.reduce((s, b) => s + getBlockVal(b.id, 'load'), 0);
@@ -1506,7 +1506,7 @@ function selectDay(idx) {
       type: 'line', label: '_upper',
       data: upper,
       fill: '+1',
-      backgroundColor: 'rgba(245,158,11,0.15)',
+      backgroundColor: 'rgba(245,158,11,0.30)',
       borderColor: 'transparent',
       pointRadius: 0, tension: 0.4, order: 4
     },
