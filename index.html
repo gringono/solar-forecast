@@ -545,7 +545,7 @@
            style="width:64px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);" />
     </div>
     <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">
-      0 = deaktiviert · Aktiviert Eigenverbrauchsberechnung (vereinfachtes Lastprofil)
+      0 = deaktiviert · Aktiviert Eigenverbrauchsberechnung mit realistischem Lastprofil
     </p>
 
     <!-- Battery storage -->
@@ -610,6 +610,30 @@
 
   <div class="error" id="errBox"></div>
 
+  <!-- Strompreis -->
+  <div class="card">
+    <span class="label">💶 Strompreis <i class="info-btn" onclick="showTip(this,'<strong>Strompreis</strong><br>Dein aktueller Arbeitspreis pro kWh. Steht auf deiner Stromrechnung. Deutscher Durchschnitt 2025: ~30–34 ct/kWh. Wird verwendet um den Geldwert von Eigenverbrauch und Netzbezug zu berechnen.')">?</i></span>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input type="range" id="iPrice" min="0.10" max="0.60" step="0.01" value="0.32"
+             oninput="sR('iPrice','nPrice','oPrice',2)" style="flex:1;" />
+      <input type="number" id="nPrice" min="0.10" max="0.60" step="0.01" value="0.32"
+             oninput="sNi('nPrice','iPrice')" onchange="sNc('nPrice','iPrice','oPrice',2)"
+             style="width:64px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);" />
+      <span style="font-size:13px;color:var(--muted);flex-shrink:0;">€/kWh</span>
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-top:6px;">Aktueller Wert: <span id="oPrice">0.32</span> €/kWh · DE Ø ~0.32 €/kWh</p>
+  </div>
+
+  <!-- Zeitblöcke: Verschattung + Lastprofil -->
+  <div class="card">
+    <span class="label">⏱️ Zeitblöcke — Verschattung &amp; Lastprofil <i class="info-btn" onclick="showTip(this,'<strong>Zeitblöcke</strong><br>Definiere für jeden Tagesabschnitt wie stark deine Module verschattet sind und welchen Anteil deines Tagesverbrauchs du in diesem Zeitraum nutzt. Verschattung 0% = keine Einschränkung, 100% = kein Ertrag. Lastanteile sollten zusammen 100% ergeben.')">?</i></span>
+    <div id="blockSum" style="font-size:12px;margin-bottom:10px;padding:6px 10px;border-radius:var(--radius-sm);background:var(--surface2);display:flex;justify-content:space-between;">
+      <span style="color:var(--muted);">Lastprofil-Summe:</span>
+      <span id="oBlockSum" style="font-weight:700;color:var(--accent);">100%</span>
+    </div>
+    <div id="timeBlocks"></div>
+  </div>
+
   <button class="calc-btn" id="btnCalc" onclick="doCalc()">☀️ Prognose berechnen</button>
 
   <p class="info-footer">
@@ -629,6 +653,15 @@
     </div>
   </div>
 
+  <!-- View toggle -->
+  <div style="display:flex;gap:8px;margin-bottom:16px;">
+    <button id="btn7d" onclick="showView('7d')" style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1px solid var(--accent);background:var(--accent-bg);color:var(--accent);font-weight:600;font-size:13px;cursor:pointer;">7-Tage-Prognose</button>
+    <button id="btnYear" onclick="showView('year')" style="flex:1;padding:9px;border-radius:var(--radius-sm);border:1px solid var(--border2);background:transparent;color:var(--muted);font-weight:500;font-size:13px;cursor:pointer;">Jahresansicht</button>
+  </div>
+
+  <!-- ── 7-Day view ── -->
+  <div id="view7d">
+
   <div class="metrics">
     <div class="metric-card">
       <div class="metric-label">7-Tage-Ertrag <i class="info-btn" onclick="showTip(this,'<strong>7-Tage-Ertrag</strong><br>Gesamte prognostizierte Solarproduktion der nächsten 7 Tage. Basiert auf stündlicher POA-Berechnung mit echten Wetterdaten, Temperatur- und WR-Clipping-Korrektur.')">?</i></div>
@@ -645,6 +678,20 @@
     <div class="metric-card">
       <div class="metric-label">Max. AC-Leistung <i class="info-btn" onclick="showTip(this,'<strong>Max. AC-Leistung</strong><br>Deine eingestellte WR-Nennleistung. Höchste Leistung die der Wechselrichter ins Hausnetz liefern kann. Alles darüber wird abgeregelt (Clipping).')">?</i></div>
       <div class="metric-value" id="mPeak">—</div>
+    </div>
+  </div>
+
+  <!-- Savings metrics -->
+  <div id="mSavingsBox" style="display:none;margin-bottom:16px;">
+    <div class="metrics" style="margin-bottom:0;">
+      <div class="metric-card" style="border-color:rgba(245,158,11,0.3);">
+        <div class="metric-label">Ersparnis diese Woche</div>
+        <div class="metric-value" style="color:var(--accent);" id="mSavings">—</div>
+      </div>
+      <div class="metric-card" style="border-color:rgba(245,158,11,0.3);">
+        <div class="metric-label">Hochrechnung Jahr</div>
+        <div class="metric-value" style="color:var(--accent);" id="mSavingsYear">—</div>
+      </div>
     </div>
   </div>
 
@@ -669,37 +716,35 @@
         <div class="metric-value" id="mDraw">—</div>
       </div>
     </div>
-    <!-- Battery metrics (shown only when battery configured) -->
+    <!-- Battery metrics -->
     <div id="mBatBox" style="display:none;">
       <p style="font-size:12px;color:var(--muted);font-weight:500;margin-bottom:8px;">🔋 Speicher · 7 Tage</p>
       <div class="metrics" style="margin-bottom:0;">
         <div class="metric-card" style="border-color:rgba(99,102,241,0.3);">
-          <div class="metric-label">Via Speicher genutzt <i class="info-btn" onclick="showTip(this,'<strong>Via Speicher genutzt</strong><br>Solarenergie die zunächst in den Akku geladen und später entladen wurde — nach Abzug der Roundtrip-Verluste. Zeigt wie aktiv der Speicher die Eigenversorgung verbessert.')">?</i></div>
+          <div class="metric-label">Via Speicher genutzt <i class="info-btn" onclick="showTip(this,'<strong>Via Speicher genutzt</strong><br>Solarenergie die zunächst in den Akku geladen und später entladen wurde — nach Abzug der Roundtrip-Verluste.')">?</i></div>
           <div class="metric-value" style="color:#818cf8;" id="mBatUsed">—</div>
         </div>
         <div class="metric-card" style="border-color:rgba(99,102,241,0.3);">
-          <div class="metric-label">Ø Ladestand abends <i class="info-btn" onclick="showTip(this,'<strong>Ø Ladestand abends</strong><br>Durchschnittlicher Akku-SoC am Ende jedes Tages (nach Sonnenuntergang). Zeigt wie gut der Speicher die Tagesproduktion für die Nacht puffert. Angabe in % der Gesamtkapazität inkl. min. SoC-Reserve.')">?</i></div>
+          <div class="metric-label">Ø Ladestand abends <i class="info-btn" onclick="showTip(this,'<strong>Ø Ladestand abends</strong><br>Durchschnittlicher Akku-SoC am Ende jedes Tages. Angabe in % der Gesamtkapazität inkl. min. SoC-Reserve.')">?</i></div>
           <div class="metric-value" style="color:#818cf8;" id="mBatSoc">—</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Vollzyklen (7 Tage) <i class="info-btn" onclick="showTip(this,'<strong>Vollzyklen</strong><br>Entladene Gesamtenergie ÷ Nutzkapazität. Wichtig für Lebensdauerplanung: LFP-Akkus ~6000 Zyklen · NMC ~3000 Zyklen. Beispiel: 2,9 Zyklen/Woche = ~150 Zyklen/Jahr.')">?</i></div>
+          <div class="metric-label">Vollzyklen (7 Tage)</div>
           <div class="metric-value" id="mBatCycles">—</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Speicher-Verluste <i class="info-btn" onclick="showTip(this,'<strong>Speicher-Verluste</strong><br>Energie die beim Laden und Entladen als Wärme verloren geht. Bei 90% Roundtrip-Wirkungsgrad sind 10% jeder gespeicherten kWh Verlust. LFP-Akkus verlieren hier weniger (~5%).')">?</i></div>
+          <div class="metric-label">Speicher-Verluste</div>
           <div class="metric-value" id="mBatLoss">—</div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Temperature correction note -->
   <div class="metric-card" id="mTempNote" style="margin-bottom:16px;display:none;">
-    <div class="metric-label">Temperaturkorrektur (Ø 7 Tage) <i class="info-btn" onclick="showTip(this,'<strong>Temperaturkorrektur</strong><br>Leistungsminderung durch Modulerwärmung. Zelltemperatur wird stündlich berechnet: T_Zelle = T_Luft + POA × (NOCT−20)/800. Verlust greift nur oberhalb von 25°C Zelltemperatur.')">?</i></div>
+    <div class="metric-label">Temperaturkorrektur (Ø 7 Tage) <i class="info-btn" onclick="showTip(this,'<strong>Temperaturkorrektur</strong><br>Leistungsminderung durch Modulerwärmung. Zelltemperatur wird stündlich berechnet: T_Zelle = T_Luft + POA × (NOCT−20)/800.')">?</i></div>
     <div style="font-size:14px;font-weight:500;" id="mTempVal">—</div>
   </div>
 
-  <!-- Battery recommendation -->
   <div id="mRecoBox" style="display:none;margin-bottom:16px;">
     <p style="font-size:12px;color:var(--muted);font-weight:500;margin-bottom:8px;">🔋 Speicher-Empfehlung</p>
     <div id="mRecoContent" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-size:13px;line-height:1.75;color:var(--text);"></div>
@@ -723,19 +768,130 @@
       </p>
     </div>
   </div>
-</div>
 
-</div><!-- /app -->
+  </div><!-- /view7d -->
+
+  <!-- ── Year view ── -->
+  <div id="viewYear" style="display:none;">
+    <div class="metrics" style="margin-bottom:16px;">
+      <div class="metric-card" style="border-color:rgba(245,158,11,0.3);">
+        <div class="metric-label">Jahresertrag (geschätzt)</div>
+        <div class="metric-value" style="color:var(--accent);" id="yTotal">—</div>
+      </div>
+      <div class="metric-card" style="border-color:rgba(245,158,11,0.3);">
+        <div class="metric-label">Ersparnis / Jahr</div>
+        <div class="metric-value" style="color:var(--accent);" id="ySavings">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Bester Monat</div>
+        <div class="metric-value" id="yBestMonth">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Schwächster Monat</div>
+        <div class="metric-value" id="yWorstMonth">—</div>
+      </div>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:500;">Monatliche Ertragsverteilung</p>
+    <div class="card" style="padding:14px;">
+      <div id="yearLegend" style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:11px;color:var(--muted);"></div>
+      <div style="position:relative;width:100%;height:240px;">
+        <canvas id="yearChart" role="img" aria-label="Monatlicher Solarertrag">Monatlicher Solarertrag</canvas>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px;">Basis: Open-Meteo Climate API · Langjährige Monatsmittelwerte · Verschattung &amp; Lastprofil eingerechnet</p>
+    </div>
+  </div>
+
+</div><!-- /vForecast -->
 
 <script>
 const DEG = Math.PI / 180;
 let selAz = 180;
 let fData = [];
 let chart = null;
+let yearChart = null;
 let gConsume = 0;
 let gBatCap = 0;
 let gBatMinSoc = 0;
-let gHourlyProd = []; // flat array of hourly produced kWh for all 7 days
+let gHourlyProd = [];
+let gLat = 51.196, gLon = 6.444, gKwp = 1.9, gTilt = 30, gEff = 80, gWrMax = 0.8, gTc = 0.40;
+
+// ── Time blocks definition ──────────────────────────────────────
+const BLOCKS = [
+  { id: 'night',   label: '🌙 Nacht',        icon: '🌙', start: 22, end: 6,  defLoad: 8,  defShade: 100 },
+  { id: 'morning', label: '🌅 Morgens',       icon: '🌅', start: 6,  end: 10, defLoad: 18, defShade: 0   },
+  { id: 'midday',  label: '☀️ Mittags',       icon: '☀️', start: 10, end: 14, defLoad: 15, defShade: 0   },
+  { id: 'aftnoon', label: '🌤️ Nachmittags',  icon: '🌤️', start: 14, end: 18, defLoad: 24, defShade: 0   },
+  { id: 'evening', label: '🌆 Abends',        icon: '🌆', start: 18, end: 22, defLoad: 35, defShade: 0   }
+];
+
+function blockForHour(h) {
+  for (const b of BLOCKS) {
+    if (b.start < b.end) { if (h >= b.start && h < b.end) return b.id; }
+    else                  { if (h >= b.start || h < b.end)  return b.id; }
+  }
+  return 'night';
+}
+
+function getBlockVal(bid, type) {
+  const el = document.getElementById(type + 'N_' + bid);
+  return el ? (parseFloat(el.value) || 0) : 0;
+}
+
+function updateBlockSum() {
+  const total = BLOCKS.reduce((s, b) => s + getBlockVal(b.id, 'load'), 0);
+  const el = document.getElementById('oBlockSum');
+  el.textContent = Math.round(total) + '%';
+  el.style.color = Math.abs(total - 100) < 1 ? '#14b8a6' : '#f87171';
+}
+
+function buildBlocks() {
+  const container = document.getElementById('timeBlocks');
+  container.innerHTML = '';
+  BLOCKS.forEach(b => {
+    const timeLabel = b.start < b.end
+      ? `${b.start}:00–${b.end}:00 Uhr`
+      : `${b.start}:00–0${b.end}:00 Uhr`;
+    const div = document.createElement('div');
+    div.style.cssText = 'background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;';
+    div.innerHTML = `
+      <p style="font-size:13px;font-weight:600;margin-bottom:10px;">${b.label} <span style="font-size:11px;color:var(--muted);font-weight:400;">${timeLabel}</span></p>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="font-size:11px;color:var(--muted);width:80px;flex-shrink:0;">Verschattung</span>
+        <input type="range" id="shadeR_${b.id}" min="0" max="100" step="5" value="${b.defShade}"
+               oninput="document.getElementById('shadeN_${b.id}').value=this.value" style="flex:1;" />
+        <input type="number" id="shadeN_${b.id}" min="0" max="100" step="5" value="${b.defShade}"
+               onchange="document.getElementById('shadeR_${b.id}').value=Math.min(100,Math.max(0,+this.value||0));this.value=document.getElementById('shadeR_${b.id}').value"
+               style="width:52px;text-align:center;padding:6px 4px;font-size:13px;font-weight:700;color:var(--accent);" />
+        <span style="font-size:11px;color:var(--muted);">%</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:11px;color:var(--muted);width:80px;flex-shrink:0;">Lastanteil</span>
+        <input type="range" id="loadR_${b.id}" min="0" max="60" step="1" value="${b.defLoad}"
+               oninput="document.getElementById('loadN_${b.id}').value=this.value;updateBlockSum()" style="flex:1;" />
+        <input type="number" id="loadN_${b.id}" min="0" max="60" step="1" value="${b.defLoad}"
+               onchange="document.getElementById('loadR_${b.id}').value=Math.min(60,Math.max(0,+this.value||0));this.value=document.getElementById('loadR_${b.id}').value;updateBlockSum()"
+               style="width:52px;text-align:center;padding:6px 4px;font-size:13px;font-weight:700;color:#14b8a6;" />
+        <span style="font-size:11px;color:var(--muted);">%</span>
+      </div>`;
+    container.appendChild(div);
+  });
+  updateBlockSum();
+}
+
+// ── View toggle ──────────────────────────────────────────────────
+function showView(v) {
+  document.getElementById('view7d').style.display    = v === '7d'   ? 'block' : 'none';
+  document.getElementById('viewYear').style.display  = v === 'year' ? 'block' : 'none';
+  document.getElementById('btn7d').style.borderColor    = v === '7d'   ? 'var(--accent)' : 'var(--border2)';
+  document.getElementById('btn7d').style.color          = v === '7d'   ? 'var(--accent)' : 'var(--muted)';
+  document.getElementById('btn7d').style.background     = v === '7d'   ? 'var(--accent-bg)' : 'transparent';
+  document.getElementById('btn7d').style.fontWeight     = v === '7d'   ? '600' : '500';
+  document.getElementById('btnYear').style.borderColor  = v === 'year' ? 'var(--accent)' : 'var(--border2)';
+  document.getElementById('btnYear').style.color        = v === 'year' ? 'var(--accent)' : 'var(--muted)';
+  document.getElementById('btnYear').style.background   = v === 'year' ? 'var(--accent-bg)' : 'transparent';
+  document.getElementById('btnYear').style.fontWeight   = v === 'year' ? '600' : '500';
+  if (v === 'year') loadYearView();
+}
 
 // ── Slider ↔ Number input sync ──────────────────────────────────
 function sR(rid, nid, oid, dec) {
@@ -898,12 +1054,23 @@ async function doCalc() {
   const loc          = document.getElementById('iLocName').value || `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
 
   const NOCT       = 45;
-  const hourCons   = consume / 24;
+  // Build per-hour consumption and shading from blocks
+  const loadSum = BLOCKS.reduce((s, b) => s + getBlockVal(b.id, 'load'), 0);
+  const hourConsArr = Array.from({length: 24}, (_, h) => {
+    const bid = blockForHour(h);
+    const loadPct = loadSum > 0 ? getBlockVal(bid, 'load') / loadSum : 1/24;
+    const blockHours = bid === 'night' ? 8 : 4;
+    return consume * loadPct / blockHours;
+  });
+  const shadeArr = Array.from({length: 24}, (_, h) => {
+    const bid = blockForHour(h);
+    return getBlockVal(bid, 'shade') / 100;
+  });
+  const price = +document.getElementById('iPrice').value;
   const batUsable  = batCap * (1 - batMinSoc);
   const sqrtEff    = Math.sqrt(batEff);
-  gConsume = consume;
-  gBatCap  = batCap;
-  gBatMinSoc = batMinSoc;
+  gConsume = consume; gBatCap = batCap; gBatMinSoc = batMinSoc;
+  gLat = lat; gLon = lon; gKwp = kwp; gTilt = tilt; gEff = eff; gWrMax = wrMax; gTc = tc;
 
   const errBox = document.getElementById('errBox');
   errBox.style.display = 'none';
@@ -937,13 +1104,15 @@ async function doCalc() {
       const hour = +t.slice(11, 13) + 0.5;
       if (!days[ds]) days[ds] = { hs: [], ccSum: 0, socEnd: 0 };
 
-      // ── POA irradiance ──
+      // ── POA irradiance with shading ──
+      const hIdx = Math.floor(hour); // 0-23
+      const shadeFactor = 1 - (shadeArr[hIdx] || 0);
       const ci  = cosAOI(lat, lon, tilt, selAz, ds, hour);
-      const poa = Math.max(0,
+      const poa = Math.max(0, (
         (DNI[i]  || 0) * ci +
         (DHI[i]  || 0) * (1 + Math.cos(beta)) / 2 +
         (GHI[i]  || 0) * 0.2 * (1 - Math.cos(beta)) / 2
-      );
+      ) * shadeFactor);
 
       // ── Temperature correction ──
       const p_dc_raw = poa * kwp * eff / 100 / 1000;
@@ -958,9 +1127,12 @@ async function doCalc() {
       const produced = Math.min(p_dc, wrMax);
       gHourlyProd.push(produced);
 
-      // ── Clear-sky reference (uncapped) ──
+      // ── Clear-sky reference (uncapped, no shading for reference) ──
       const poa_cs = clearSkyPOA(lat, lon, tilt, selAz, ds, hour);
-      const cs_kwh = poa_cs * kwp * eff / 100 / 1000; // kWh this hour
+      const cs_kwh = poa_cs * kwp * eff / 100 / 1000;
+
+      // ── Per-hour consumption from blocks ──
+      const hourCons = hourConsArr[hIdx] || 0; // kWh this hour
 
       let selfDirect = 0, batCharge = 0, batDischarge = 0, feedIn = 0, gridDraw = 0;
       let batLossHour = 0;
@@ -1055,6 +1227,18 @@ async function doCalc() {
     document.getElementById('mAvg').textContent  = (total / fData.length).toFixed(1) + ' kWh';
     document.getElementById('mBest').textContent = best.kwh.toFixed(1) + ' kWh';
     document.getElementById('mPeak').textContent = wrMax.toFixed(1) + ' kW';
+
+    // Savings
+    if (consume > 0 && price > 0) {
+      const weekSelf = fData.reduce((s, d) => s + d.selfCons, 0);
+      const weekSaved = +(weekSelf * price).toFixed(2);
+      const yearSaved = +(weekSaved * 52).toFixed(0);
+      document.getElementById('mSavings').textContent = weekSaved.toFixed(2) + ' €';
+      document.getElementById('mSavingsYear').textContent = yearSaved + ' €';
+      document.getElementById('mSavingsBox').style.display = 'block';
+    } else {
+      document.getElementById('mSavingsBox').style.display = 'none';
+    }
     document.getElementById('fTitle').textContent = loc;
     document.getElementById('fSub').textContent   =
       `${kwp} kWp · ${AZ_NAMES[selAz] || selAz + '°'} · ${tilt}° · WR ${wrMax} kW` +
@@ -1125,6 +1309,9 @@ async function doCalc() {
 
     document.getElementById('vSetup').style.display = 'none';
     document.getElementById('vForecast').style.display = 'block';
+    document.getElementById('btnYear').dataset.loaded = '';
+    if (yearChart) { yearChart.destroy(); yearChart = null; }
+    showView('7d');
     calcBatReco();
     selectDay(0);
 
@@ -1158,7 +1345,7 @@ function calcBatReco() {
     return;
   }
 
-  const hourCons    = gConsume / 24;
+  const hourCons    = gConsume / 24; // simplified for reco simulation
   const chargeW     = +document.getElementById('iBatChargeW').value;
   const dischargeW  = +document.getElementById('iBatDischargeW').value;
   const batEff      = +document.getElementById('iBatEff').value / 100;
@@ -1298,11 +1485,20 @@ function selectDay(idx) {
   const tc = isDark ? 'rgba(255,255,255,0.40)' : 'rgba(0,0,0,0.40)';
 
   const labels   = d.hs.map(h => h.h + ':00');
-  const forecast = d.hs.map(h => +h.kwhNc.toFixed(3));   // uncapped: module potential
+  const forecast = d.hs.map(h => +h.kwhNc.toFixed(3));
   const clearSky = d.hs.map(h => +h.cs.toFixed(3));
   const upper    = d.hs.map((h, i) => +Math.min(h.kwhNc * 1.20, clearSky[i] * 0.98).toFixed(3));
   const lower    = d.hs.map(h => +Math.max(h.kwhNc * 0.80, 0).toFixed(3));
-  const hourCons = gConsume > 0 ? +(gConsume / 24).toFixed(3) : 0;
+  // Build block-aware hourly consumption line
+  const loadSum = BLOCKS.reduce((s, b) => s + getBlockVal(b.id, 'load'), 0);
+  const conLine = d.hs.map(h => {
+    if (gConsume === 0) return 0;
+    const bid = blockForHour(h.h);
+    const loadPct = loadSum > 0 ? getBlockVal(bid, 'load') / loadSum : 1/24;
+    const blockHours = bid === 'night' ? 8 : 4;
+    return +(gConsume * loadPct / blockHours).toFixed(3);
+  });
+  const hourCons = gConsume / 24; // for tooltip surplus calc
 
   const datasets = [
     // ① Band upper edge (fills down to lower)
@@ -1351,7 +1547,7 @@ function selectDay(idx) {
   if (gConsume > 0) {
     datasets.push({
       type: 'line', label: 'Ø Verbrauch/Stunde',
-      data: d.hs.map(() => hourCons),
+      data: conLine,
       borderColor: '#14b8a6',
       borderWidth: 1.5,
       borderDash: [4, 3],
@@ -1444,13 +1640,159 @@ function selectDay(idx) {
   sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+// ── Annual view ─────────────────────────────────────────────────
+async function loadYearView() {
+  const btn = document.getElementById('btnYear');
+  if (btn.dataset.loaded === '1') return;
+  btn.textContent = '⏳ Lade…';
+
+  try {
+    // Use Historical Weather API (ERA5 reanalysis) — last full year
+    const year = new Date().getFullYear() - 1;
+    const url = `https://archive-api.open-meteo.com/v1/archive` +
+      `?latitude=${gLat}&longitude=${gLon}` +
+      `&start_date=${year}-01-01&end_date=${year}-12-31` +
+      `&daily=shortwave_radiation_sum,temperature_2m_max` +
+      `&timezone=auto`;
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const j = await res.json();
+
+    const dates = j.daily?.time || [];
+    const radArr = j.daily?.shortwave_radiation_sum || [];
+    const tempArr = j.daily?.temperature_2m_max || [];
+
+    if (!dates.length) throw new Error('Keine Daten');
+
+    const months = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+    const daysInMonth = [31,28,31,30,31,30,31,31,30,31,30,31];
+
+    // Group by month
+    const mRad  = Array(12).fill(0);
+    const mTemp = Array(12).fill(0);
+    const mCnt  = Array(12).fill(0);
+
+    dates.forEach((d, i) => {
+      const m = +d.slice(5, 7) - 1;
+      if (radArr[i]  != null) { mRad[m]  += radArr[i];  }
+      if (tempArr[i] != null) { mTemp[m] += tempArr[i]; }
+      mCnt[m]++;
+    });
+
+    // Monthly kWh
+    const tiltFactor = 1 + 0.35 * Math.cos((gTilt - 35) * DEG);
+    const loadSum = BLOCKS.reduce((s, b) => s + getBlockVal(b.id, 'load'), 0);
+    const price = +document.getElementById('iPrice').value;
+
+    const monthlyKwh = [];
+    for (let m = 0; m < 12; m++) {
+      if (mCnt[m] === 0) { monthlyKwh.push(0); continue; }
+      // radArr[m] is MJ/m²/month total → /3.6 = kWh/m²/month
+      const radMonthKwh = mRad[m] / 3.6;
+      const tAvg = mTemp[m] / mCnt[m];
+      const radDay = radMonthKwh / mCnt[m];
+      const tCell = tAvg + radDay * 0.8 * (45 - 20) / 800;
+      const tempFact = Math.max(0.7, 1 - (gTc / 100) * Math.max(0, tCell - 25));
+
+      // Shade factor: weighted by daytime blocks
+      const shadeFact = 1 - (
+        (getBlockVal('morning','shade') * 4 +
+         getBlockVal('midday','shade') * 4 +
+         getBlockVal('aftnoon','shade') * 4 +
+         getBlockVal('evening','shade') * 2) / 14
+      ) / 100;
+
+      const wrFactor = Math.min(1, gWrMax / Math.max(0.01, gKwp * gEff / 100));
+      const kwh = radMonthKwh * tiltFactor * gKwp * (gEff / 100) * tempFact * shadeFact * wrFactor;
+      monthlyKwh.push(+kwh.toFixed(1));
+    }
+
+    const yearTotal = monthlyKwh.reduce((s, v) => s + v, 0);
+    const bestIdx  = monthlyKwh.indexOf(Math.max(...monthlyKwh));
+    const worstIdx = monthlyKwh.indexOf(Math.min(...monthlyKwh));
+
+    document.getElementById('yTotal').textContent = yearTotal.toFixed(0) + ' kWh';
+    document.getElementById('yBestMonth').textContent  = months[bestIdx]  + ' · ' + monthlyKwh[bestIdx].toFixed(0)  + ' kWh';
+    document.getElementById('yWorstMonth').textContent = months[worstIdx] + ' · ' + monthlyKwh[worstIdx].toFixed(0) + ' kWh';
+
+    if (gConsume > 0 && price > 0) {
+      const selfRatio  = Math.min(0.9, gConsume * 365 / (yearTotal * 1.2 + 1));
+      const yearSelf   = yearTotal * selfRatio;
+      const yearSaved  = +(yearSelf * price).toFixed(0);
+      document.getElementById('ySavings').textContent = yearSaved + ' €';
+    } else {
+      document.getElementById('ySavings').textContent = price > 0 ? '—' : 'Strompreis eingeben';
+    }
+
+    // Chart
+    const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+    const gc  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+    const tc2 = isDark ? 'rgba(255,255,255,0.40)' : 'rgba(0,0,0,0.40)';
+    const avg = yearTotal / 12;
+
+    if (yearChart) { yearChart.destroy(); yearChart = null; }
+
+    document.getElementById('yearLegend').innerHTML =
+      `<span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#f59e0b;"></span>Über Jahresdurchschnitt</span>` +
+      `<span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#fb923c;"></span>Unter Jahresdurchschnitt</span>` +
+      `<span style="font-size:10px;color:var(--muted);margin-left:4px;">Basis: ERA5 ${year}</span>`;
+
+    yearChart = new Chart(document.getElementById('yearChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: months,
+        datasets: [{
+          label: 'kWh',
+          data: monthlyKwh,
+          backgroundColor: monthlyKwh.map(v => v >= avg ? '#f59e0b' : '#fb923c'),
+          borderRadius: 4,
+          borderSkipped: false
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#111827', borderColor: '#1e2d45', borderWidth: 1,
+            callbacks: {
+              label: ctx => '  ' + ctx.raw.toFixed(0) + ' kWh',
+              afterBody: ts => {
+                const m = ts[0].dataIndex;
+                const daily = daysInMonth[m] > 0 ? (monthlyKwh[m] / daysInMonth[m]).toFixed(1) : '—';
+                return [`  Ø ${daily} kWh/Tag`, `  ${((monthlyKwh[m]/yearTotal)*100).toFixed(1)}% des Jahresertrags`];
+              }
+            }
+          }
+        },
+        scales: {
+          x: { ticks: { color: tc2, font: { size: 11 } }, grid: { color: gc } },
+          y: { beginAtZero: true, ticks: { color: tc2, font: { size: 10 }, callback: v => v + ' kWh' }, grid: { color: gc } }
+        }
+      }
+    });
+
+    document.getElementById('yearChart').parentElement.style.height = '240px';
+    btn.dataset.loaded = '1';
+
+  } catch (e) {
+    document.getElementById('yTotal').textContent = 'Fehler: ' + e.message;
+    console.error('Year view error:', e);
+  }
+  btn.textContent = 'Jahresansicht';
+}
+
 function showSetup() {
   document.getElementById('vForecast').style.display = 'none';
   document.getElementById('vSetup').style.display = 'block';
   if (chart) { chart.destroy(); chart = null; }
+  if (yearChart) { yearChart.destroy(); yearChart = null; }
+  document.getElementById('btnYear').dataset.loaded = '';
 }
 
 setAz(180);
+buildBlocks();
 </script>
 
 <div id="tipBox"></div>
