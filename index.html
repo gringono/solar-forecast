@@ -1345,49 +1345,58 @@ function calcBatReco() {
     return;
   }
 
-  const hourCons    = gConsume / 24; // simplified for reco simulation
-  const chargeW     = +document.getElementById('iBatChargeW').value;
-  const dischargeW  = +document.getElementById('iBatDischargeW').value;
-  const batEff      = +document.getElementById('iBatEff').value / 100;
-  const minSoc      = gBatMinSoc;
-  const sqrtEff     = Math.sqrt(batEff);
-  const totalDemand = hourCons * gHourlyProd.length;
-  const currentCap  = gBatCap;
-  const priceKwh    = 0.30; // €/kWh — German avg assumption
-  const batPriceKwh = 250;  // €/kWh installed for LFP expansion
+  // Build block-aware hourly consumption (same as doCalc)
+  const loadSum = BLOCKS.reduce((s, b) => s + getBlockVal(b.id, 'load'), 0);
+  const hourConsArr = Array.from({length: 24}, (_, h) => {
+    const bid = blockForHour(h);
+    const loadPct = loadSum > 0 ? getBlockVal(bid, 'load') / loadSum : 1/24;
+    const blockHours = bid === 'night' ? 8 : 4;
+    return gConsume * loadPct / blockHours;
+  });
+
+  const chargeW    = +document.getElementById('iBatChargeW').value;
+  const dischargeW = +document.getElementById('iBatDischargeW').value;
+  const batEff     = +document.getElementById('iBatEff').value / 100;
+  const minSoc     = gBatMinSoc;
+  const sqrtEff    = Math.sqrt(batEff);
+  const totalDemand = gConsume * 7;  // 7-day demand
+  const currentCap = gBatCap;
+  const priceKwh   = +document.getElementById('iPrice').value || 0.30;
+  const batPriceKwh = 250;
 
   function simCap(cap) {
     const usable = cap * (1 - minSoc);
     let soc = usable * 0.5, self = 0, draw = 0;
-    gHourlyProd.forEach(function(prod) {
-      const surplus = prod - hourCons;
+    gHourlyProd.forEach(function(prod, i) {
+      const hc = hourConsArr[i % 24];
+      const surplus = prod - hc;
       if (surplus >= 0) {
-        self += hourCons;
-        if (cap > 0) {
+        self += hc;
+        if (cap > 0 && soc < usable) {
           const ch = Math.min(surplus, chargeW, Math.max(0, usable - soc) / sqrtEff);
           soc = Math.min(usable, soc + ch * sqrtEff);
         }
       } else {
         self += prod;
         if (cap > 0 && soc > 0) {
-          const av  = Math.min(soc, dischargeW, (-surplus) / sqrtEff);
-          const del = av * sqrtEff;
-          soc -= av;
+          const av    = Math.min(soc, dischargeW, (-surplus) / sqrtEff);
+          const del   = av * sqrtEff;
+          soc        -= av;
           const extra = Math.min(del, -surplus);
-          self += extra;
-          draw += Math.max(0, -surplus - extra);
+          self       += extra;
+          draw       += Math.max(0, -surplus - extra);
         } else {
           draw += -surplus;
         }
       }
     });
     return {
-      autarky: Math.round(Math.min(self, totalDemand) / totalDemand * 100),
+      autarky:  Math.round(Math.min(self, totalDemand) / totalDemand * 100),
       weekDraw: +draw.toFixed(1)
     };
   }
 
-  // Simulate 0 → max(currentCap*3, 20) in 0.5 kWh steps
+  // Simulate capacities
   const maxCap = Math.min(30, Math.max(currentCap * 3, currentCap + 12));
   const step = 0.5;
   const results = [];
@@ -1395,71 +1404,76 @@ function calcBatReco() {
     results.push({ cap: +c.toFixed(1), ...simCap(c) });
   }
 
+  // Find current — exact match only
+  const curIdx = results.findIndex(r => Math.abs(r.cap - currentCap) < 0.26);
+  const cur    = results[curIdx >= 0 ? curIdx : 0];
   const noBat  = results[0];
-  const cur    = results.find(r => Math.abs(r.cap - currentCap) < 0.3) || results[results.length - 1];
 
-  // Marginal autarky gain per kWh from current size onward
-  // Find "knee": first cap where marginal gain < 2.5% per kWh (= 1.25% per 0.5 kWh step)
-  let kneeIdx = results.findIndex(function(r, i) {
-    if (r.cap <= currentCap || i < 2) return false;
-    const prev = results[i - 1];
-    return (r.autarky - prev.autarky) / step < 2.5;
-  });
-  if (kneeIdx === -1) kneeIdx = results.length - 1;
+  // Find knee: first point beyond current where marginal gain < 1% per kWh
+  let kneeIdx = -1;
+  for (let i = (curIdx >= 0 ? curIdx : 0) + 1; i < results.length - 1; i++) {
+    const marginal = (results[i].autarky - results[i-1].autarky) / step;
+    if (marginal < 1.0) { kneeIdx = i; break; }
+  }
+  if (kneeIdx === -1) kneeIdx = Math.min(results.length - 1, (curIdx >= 0 ? curIdx : 0) + 1);
   const opt = results[kneeIdx];
 
-  const addCap  = +(opt.cap - currentCap).toFixed(1);
-  const autGain = opt.autarky - cur.autarky;
-  const drawSaved = +(cur.weekDraw - opt.weekDraw).toFixed(1);
-  const annualSaved = +(drawSaved * 52 * priceKwh).toFixed(0);
-  const addCost = +(addCap * batPriceKwh).toFixed(0);
-  const payback = annualSaved > 0 ? +(addCost / annualSaved).toFixed(1) : '∞';
+  const addCap     = +(opt.cap - currentCap).toFixed(1);
+  const autGain    = opt.autarky - cur.autarky;
+  const drawSaved  = +(cur.weekDraw - opt.weekDraw).toFixed(1);
+  const annualSaved= +(drawSaved * 52 * priceKwh).toFixed(0);
+  const addCost    = +(addCap * batPriceKwh).toFixed(0);
+  const payback    = annualSaved > 0 ? +(addCost / annualSaved).toFixed(1) : '∞';
 
-  // Build a mini table for 4 key sizes
-  const keyCapsList = [0, currentCap];
+  // Table: unique capacities, no duplicate labels
+  const keySet = new Set([0]);
+  keySet.add(+currentCap.toFixed(1));
   const step2 = currentCap >= 8 ? 4 : 2;
-  for (let c = currentCap + step2; c <= maxCap && keyCapsList.length < 6; c += step2) {
-    keyCapsList.push(+c.toFixed(1));
-  }
-  if (!keyCapsList.includes(opt.cap) && opt.cap > currentCap) keyCapsList.push(opt.cap);
-  keyCapsList.sort((a, b) => a - b);
+  for (let c = currentCap + step2; c <= maxCap && keySet.size < 7; c += step2)
+    keySet.add(+c.toFixed(1));
+  if (opt.cap > currentCap) keySet.add(+opt.cap.toFixed(1));
+  const keyCapsList = Array.from(keySet).sort((a, b) => a - b);
 
   const rows = keyCapsList.map(function(cap) {
-    const r = results.find(x => Math.abs(x.cap - cap) < 0.3);
+    const r = results.find(x => Math.abs(x.cap - cap) < 0.26);
     if (!r) return '';
-    const isCurrent = Math.abs(cap - currentCap) < 0.3;
-    const isOpt = Math.abs(cap - opt.cap) < 0.3 && opt.cap > currentCap;
-    const highlight = isCurrent ? 'color:#f59e0b;' : isOpt ? 'color:#14b8a6;' : '';
-    const tag = isCurrent ? ' ← aktuell' : isOpt ? ' ← optimal' : '';
+    const isCurrent = Math.abs(cap - currentCap) < 0.26;
+    const isOpt     = !isCurrent && Math.abs(cap - opt.cap) < 0.26 && opt.cap > currentCap && autGain >= 2;
+    const color  = isCurrent ? '#f59e0b' : isOpt ? '#14b8a6' : '';
+    const tag    = isCurrent ? ' ← aktuell' : isOpt ? ' ← empfohlen' : '';
+    const style  = color ? `color:${color};font-weight:600;` : '';
     return '<tr>' +
-      '<td style="padding:4px 8px 4px 0;' + highlight + 'font-weight:' + (isCurrent || isOpt ? '600' : '400') + ';">' + cap.toFixed(1) + ' kWh' + tag + '</td>' +
-      '<td style="padding:4px 8px;' + highlight + '">' + r.autarky + '%</td>' +
-      '<td style="padding:4px 0;color:var(--muted);">' + r.weekDraw.toFixed(1) + ' kWh/W</td>' +
+      `<td style="padding:4px 8px 4px 0;${style}">${cap.toFixed(1)} kWh${tag}</td>` +
+      `<td style="padding:4px 8px;${style}">${r.autarky}%</td>` +
+      `<td style="padding:4px 0;color:var(--muted);">${r.weekDraw.toFixed(1)} kWh/Wo</td>` +
     '</tr>';
   }).join('');
 
   let reco;
   if (currentCap === 0) {
-    reco = 'Ohne Speicher liegt der Autarkiegrad bei <strong>' + noBat.autarky + '%</strong>. Ein Speicher würde die Eigenversorgung deutlich verbessern.';
-  } else if (addCap <= 0.4) {
-    reco = '✅ Deine <strong>' + currentCap + ' kWh</strong> sind bereits nah am optimalen Punkt. Eine Vergrößerung bringt kaum noch Mehrwert.';
-  } else if (autGain >= 8) {
-    reco = '📈 Eine Erweiterung auf <strong>' + opt.cap + ' kWh</strong> (+' + addCap + ' kWh) würde den Autarkiegrad von ' + cur.autarky + '% auf <strong>' + opt.autarky + '%</strong> steigern (+' + autGain + '%). ' +
-      'Das spart ca. <strong>' + drawSaved + ' kWh/Woche</strong> Netzbezug — bei 30 ct/kWh ~<strong>' + annualSaved + ' €/Jahr</strong>. ' +
-      'Kosten für die Erweiterung (Schätzung ~250 €/kWh): ca. <strong>' + addCost + ' €</strong> → Amortisation ~<strong>' + payback + ' Jahre</strong>.';
+    const best = results[kneeIdx];
+    reco = `Ohne Speicher: Autarkiegrad <strong>${noBat.autarky}%</strong>. ` +
+      `Ein Speicher von <strong>${best.cap} kWh</strong> würde ihn auf <strong>${best.autarky}%</strong> steigern.`;
+  } else if (addCap <= 0.4 || autGain < 2) {
+    reco = `✅ Deine <strong>${currentCap} kWh</strong> sind bereits nah am optimalen Punkt für deine ${gKwp} kWp Anlage. Eine Vergrößerung bringt kaum noch Mehrwert.`;
+  } else if (autGain >= 5) {
+    reco = `📈 Erweiterung auf <strong>${opt.cap} kWh</strong> (+${addCap} kWh) → Autarkie von ${cur.autarky}% auf <strong>${opt.autarky}%</strong> (+${autGain}%). ` +
+      `Spart ca. <strong>${drawSaved} kWh/Woche</strong> Netzbezug — ~<strong>${annualSaved} €/Jahr</strong> bei ${(priceKwh*100).toFixed(0)} ct/kWh. ` +
+      `Kosten ~${addCost} € → Amortisation ~<strong>${payback} Jahre</strong>.`;
   } else {
-    reco = '⚖️ Eine Erweiterung auf <strong>' + opt.cap + ' kWh</strong> brächte noch <strong>+' + autGain + '%</strong> Autarkie (+' + addCap + ' kWh). ' +
-      'Der Grenznutzen ist aber gering. Lohnt sich nur bei sehr langem Zeithorizont oder günstigem Speicherpreis.';
+    reco = `⚖️ Erweiterung auf <strong>${opt.cap} kWh</strong> brächte +${autGain}% Autarkie. ` +
+      `Grenznutzen gering bei ${gKwp} kWp — lohnt sich nur bei günstigem Speicherpreis oder hohem Verbrauch.`;
   }
 
   document.getElementById('mRecoContent').innerHTML =
-    '<table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:12px;">' +
-    '<tr style="color:var(--muted);font-size:11px;border-bottom:1px solid var(--border);">' +
-    '<th style="text-align:left;padding-bottom:4px;">Kapazität</th>' +
-    '<th style="text-align:left;padding-bottom:4px;">Autarkie</th>' +
-    '<th style="text-align:left;padding-bottom:4px;">Netzbezug</th></tr>' +
-    rows + '</table>' + reco +
-    '<p style="font-size:11px;color:var(--muted);margin-top:8px;">Strompreis: 30 ct/kWh · Speicherpreis: ~250 €/kWh (Schätzwert) · Vereinfachtes Lastprofil</p>';
+    `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:12px;">` +
+    `<tr style="color:var(--muted);font-size:11px;border-bottom:1px solid var(--border);">` +
+    `<th style="text-align:left;padding-bottom:4px;font-weight:500;">Kapazität</th>` +
+    `<th style="text-align:left;padding-bottom:4px;font-weight:500;">Autarkie</th>` +
+    `<th style="text-align:left;padding-bottom:4px;font-weight:500;">Netzbezug/Wo</th></tr>` +
+    rows + `</table>` + reco +
+    `<p style="font-size:11px;color:var(--muted);margin-top:8px;">` +
+    `Strompreis: ${(priceKwh*100).toFixed(0)} ct/kWh · Speicherpreis: ~250 €/kWh · Lastprofil mit Zeitblöcken</p>`;
 
   box.style.display = 'block';
 }
