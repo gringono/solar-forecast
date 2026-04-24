@@ -481,6 +481,71 @@
     <p style="font-size:11px;color:var(--muted);margin-top:6px;">0° = Nord · 90° = Ost · 180° = Süd · 270° = West</p>
   </div>
 
+  <!-- Second array -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <span class="label" style="margin-bottom:0;">⚡ Zweite Modulfläche <i class="info-btn" onclick="showTip(this,'<strong>Zweite Ausrichtung</strong><br>Für Ost-West-Aufteilung oder zwei verschieden geneigte Dachflächen. Die Leistung beider Flächen wird stündlich addiert, dann gemeinsam auf den WR-Clipping-Wert gekappt. Tipp: Ost 90° + West 270°, je die Hälfte der Gesamtleistung.')">?</i></span>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <span style="font-size:12px;color:var(--muted);">Aktivieren</span>
+        <input type="checkbox" id="chkArr2" onchange="toggleArr2()" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;" />
+      </label>
+    </div>
+
+    <div id="arr2Fields" style="display:none;margin-top:10px;">
+      <!-- kWp 2 -->
+      <div class="slider-row" style="margin-bottom:6px;">
+        <span style="font-size:12px;color:var(--muted);">Leistung Fläche 2</span>
+        <span style="font-size:13px;font-weight:700;color:var(--accent);"><span id="oKwp2">1.0</span> kWp</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+        <input type="range" id="iKwp2" min="0.5" max="50" step="0.5" value="1.0"
+               oninput="sR('iKwp2','nKwp2','oKwp2',1)" style="flex:1;" />
+        <input type="number" id="nKwp2" min="0.5" max="50" step="0.5" value="1.0"
+               oninput="sNi('nKwp2','iKwp2')" onchange="sNc('nKwp2','iKwp2','oKwp2',1)"
+               style="width:64px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);" />
+      </div>
+
+      <!-- Tilt 2 -->
+      <div class="slider-row" style="margin-bottom:6px;">
+        <span style="font-size:12px;color:var(--muted);">Neigungswinkel Fläche 2</span>
+        <span style="font-size:13px;font-weight:700;color:var(--accent);"><span id="oTilt2">30</span>°</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+        <input type="range" id="iTilt2" min="0" max="60" step="1" value="30"
+               oninput="sR('iTilt2','nTilt2','oTilt2',0)" style="flex:1;" />
+        <input type="number" id="nTilt2" min="0" max="60" step="1" value="30"
+               oninput="sNi('nTilt2','iTilt2')" onchange="sNc('nTilt2','iTilt2','oTilt2',0)"
+               style="width:64px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);" />
+      </div>
+
+      <!-- Azimuth 2 -->
+      <div class="slider-row" style="margin-bottom:8px;">
+        <span style="font-size:12px;color:var(--muted);">Ausrichtung Fläche 2</span>
+        <span style="font-size:13px;font-weight:700;color:var(--accent);"><span id="oAzName2">West</span></span>
+      </div>
+      <div class="az-grid" style="margin-bottom:8px;">
+        <button class="az-btn" data-d2="0"   onclick="setAz2(0)">N</button>
+        <button class="az-btn" data-d2="45"  onclick="setAz2(45)">NO</button>
+        <button class="az-btn" data-d2="90"  onclick="setAz2(90)">O</button>
+        <button class="az-btn" data-d2="135" onclick="setAz2(135)">SO</button>
+        <button class="az-btn" data-d2="180" onclick="setAz2(180)">S</button>
+        <button class="az-btn" data-d2="225" onclick="setAz2(225)">SW</button>
+        <button class="az-btn active2" data-d2="270" onclick="setAz2(270)">W</button>
+        <button class="az-btn" data-d2="315" onclick="setAz2(315)">NW</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <input type="range" id="iAzSlider2" min="0" max="359" step="1" value="270"
+               oninput="setAz2(+this.value)" style="flex:1;" />
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+          <input type="number" id="iAzDeg2" min="0" max="359" step="1" value="270"
+                 oninput="setAz2(+this.value)"
+                 style="width:66px;text-align:center;padding:8px 6px;font-size:15px;font-weight:700;color:var(--accent);" />
+          <span style="font-size:13px;color:var(--muted);">°</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Efficiency -->
   <div class="card">
     <div class="slider-row">
@@ -539,9 +604,9 @@
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
     <input type="range" id="iConsume" min="0" max="60" step="0.5" value="0"
-           oninput="sR('iConsume','nConsume','oConsume',1)" style="flex:1;" />
+           oninput="sR('iConsume','nConsume','oConsume',1);buildBlocks()" style="flex:1;" />
     <input type="number" id="nConsume" min="0" max="60" step="0.5" value="0"
-           oninput="sNi('nConsume','iConsume')" onchange="sNc('nConsume','iConsume','oConsume',1)"
+           oninput="sNi('nConsume','iConsume')" onchange="sNc('nConsume','iConsume','oConsume',1);buildBlocks()"
            style="width:64px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);" />
     </div>
     <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">
@@ -614,22 +679,57 @@
   <div class="card">
     <span class="label">💶 Strompreis <i class="info-btn" onclick="showTip(this,'<strong>Strompreis</strong><br>Dein aktueller Arbeitspreis pro kWh. Steht auf deiner Stromrechnung. Deutscher Durchschnitt 2025: ~30–34 ct/kWh. Wird verwendet um den Geldwert von Eigenverbrauch und Netzbezug zu berechnen.')">?</i></span>
     <div style="display:flex;gap:8px;align-items:center;">
-      <input type="range" id="iPrice" min="0.10" max="0.60" step="0.01" value="0.32"
+      <input type="range" id="iPrice" min="0.10" max="0.60" step="0.01" value="0.38"
              oninput="sR('iPrice','nPrice','oPrice',2)" style="flex:1;" />
       <input type="number" id="nPrice" min="0.10" max="0.60" step="0.01" value="0.32"
              oninput="sNi('nPrice','iPrice')" onchange="sNc('nPrice','iPrice','oPrice',2)"
              style="width:64px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);" />
       <span style="font-size:13px;color:var(--muted);flex-shrink:0;">€/kWh</span>
     </div>
-    <p style="font-size:11px;color:var(--muted);margin-top:6px;">Aktueller Wert: <span id="oPrice">0.32</span> €/kWh · DE Ø ~0.32 €/kWh</p>
+    <p style="font-size:11px;color:var(--muted);margin-top:6px;">Aktueller Wert: <span id="oPrice">0.38</span> €/kWh · DE Ø ~0.41 €/kWh (Okt. 2025)</p>
+  </div>
+
+  <!-- Investment / Amortisation -->
+  <div class="card">
+    <span class="label">📊 Investition &amp; Amortisation <i class="info-btn" onclick="showTip(this,'<strong>Amortisationsrechner</strong><br>Gib die Gesamtkosten deiner Anlage ein (Module, WR, Speicher, Montage). Die App berechnet wann sich die Investition durch gesparten Strom amortisiert hat — basierend auf deinem eingestellten Strompreis und dem simulierten Jahresertrag.')">?</i></span>
+
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+      <span style="font-size:13px;color:var(--muted);font-weight:500;">Anschaffungskosten</span>
+      <span style="font-size:14px;font-weight:700;color:var(--accent);"><span id="oInvest">600</span> €</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
+      <input type="range" id="iInvest" min="0" max="5000" step="50" value="600"
+             oninput="sR('iInvest','nInvest','oInvest',0)" style="flex:1;" />
+      <input type="number" id="nInvest" min="0" max="50000" step="50" value="600"
+             oninput="sNi('nInvest','iInvest')" onchange="sNc('nInvest','iInvest','oInvest',0)"
+             style="width:72px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);" />
+      <span style="font-size:13px;color:var(--muted);flex-shrink:0;">€</span>
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-top:4px;">Module + WR + Speicher + Montage · 0 = deaktiviert</p>
+
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+        <span style="font-size:13px;color:var(--muted);font-weight:500;">Autarkieziel (Speicher-Empfehlung) <i class="info-btn" onclick="showTip(this,'<strong>Autarkieziel</strong><br>Gewünschter Autarkiegrad für die Speicher- und Modulempfehlung. 95% = nahezu netzunabhängig, aber teuer. 70–80% = wirtschaftlich oft sinnvoller. Die Empfehlung zeigt die günstigste Kombination aus Modulen + Speicher um dieses Ziel zu erreichen.')">?</i></span>
+        <span style="font-size:14px;font-weight:700;color:var(--accent);"><span id="oAutTarget">80</span>%</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
+        <input type="range" id="iAutTarget" min="50" max="99" step="1" value="80"
+               oninput="sR('iAutTarget','nAutTarget','oAutTarget',0)" style="flex:1;" />
+        <input type="number" id="nAutTarget" min="50" max="99" step="1" value="80"
+               oninput="sNi('nAutTarget','iAutTarget')" onchange="sNc('nAutTarget','iAutTarget','oAutTarget',0)"
+               style="width:55px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);" />
+        <span style="font-size:13px;color:var(--muted);flex-shrink:0;">%</span>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:2px;">50–99% · Empfehlung: 70–85% für gutes Kosten-Nutzen-Verhältnis</p>
+    </div>
   </div>
 
   <!-- Zeitblöcke: Verschattung + Lastprofil -->
   <div class="card">
     <span class="label">⏱️ Zeitblöcke — Verschattung &amp; Lastprofil <i class="info-btn" onclick="showTip(this,'<strong>Zeitblöcke</strong><br>Definiere für jeden Tagesabschnitt wie stark deine Module verschattet sind und welchen Anteil deines Tagesverbrauchs du in diesem Zeitraum nutzt. Verschattung 0% = keine Einschränkung, 100% = kein Ertrag. Lastanteile sollten zusammen 100% ergeben.')">?</i></span>
     <div id="blockSum" style="font-size:12px;margin-bottom:10px;padding:6px 10px;border-radius:var(--radius-sm);background:var(--surface2);display:flex;justify-content:space-between;">
-      <span style="color:var(--muted);">Lastprofil-Summe:</span>
-      <span id="oBlockSum" style="font-weight:700;color:var(--accent);">100%</span>
+      <span style="color:var(--muted);">Verbrauch-Summe:</span>
+      <span id="oBlockSum" style="font-weight:700;color:var(--accent);">0 / 0 kWh</span>
     </div>
     <div id="timeBlocks"></div>
   </div>
@@ -695,7 +795,30 @@
     </div>
   </div>
 
-  <!-- Self-consumption metrics (shown only when consumption > 0) -->
+  <!-- Amortisation chart -->
+  <div id="mAmortBox" style="display:none;margin-bottom:16px;">
+    <p style="font-size:12px;color:var(--muted);font-weight:500;margin-bottom:8px;">📊 Amortisationsverlauf</p>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
+        <div>
+          <p style="font-size:11px;color:var(--muted);margin-bottom:3px;">Jahresersparnis</p>
+          <p style="font-size:16px;font-weight:700;color:var(--accent);" id="mAmortAnnual">—</p>
+        </div>
+        <div>
+          <p style="font-size:11px;color:var(--muted);margin-bottom:3px;">Amortisation</p>
+          <p style="font-size:16px;font-weight:700;color:#14b8a6;" id="mAmortYears">—</p>
+        </div>
+        <div>
+          <p style="font-size:11px;color:var(--muted);margin-bottom:3px;">Gewinn 20J.</p>
+          <p style="font-size:16px;font-weight:700;color:#818cf8;" id="mAmortProfit">—</p>
+        </div>
+      </div>
+      <div style="position:relative;width:100%;height:180px;">
+        <canvas id="amortChart"></canvas>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px;" id="mAmortNote">Saisonaler Korrekturfaktor aus 7-Tage-Wetterdaten hochgerechnet</p>
+    </div>
+  </div>
   <div id="mSelfBox" style="display:none;margin-bottom:16px;">
     <p style="font-size:12px;color:var(--muted);font-weight:500;margin-bottom:8px;">Eigenverbrauch · 7 Tage</p>
     <div class="metrics" style="margin-bottom:8px;">
@@ -746,7 +869,7 @@
   </div>
 
   <div id="mRecoBox" style="display:none;margin-bottom:16px;">
-    <p style="font-size:12px;color:var(--muted);font-weight:500;margin-bottom:8px;">🔋 Speicher-Empfehlung</p>
+    <p style="font-size:12px;color:var(--muted);font-weight:500;margin-bottom:8px;">🔋 Speicher-Empfehlung · Ziel: <span id="mRecoTarget">80</span>% Autarkie</p>
     <div id="mRecoContent" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-size:13px;line-height:1.75;color:var(--text);"></div>
   </div>
 
@@ -806,6 +929,8 @@
 <script>
 const DEG = Math.PI / 180;
 let selAz = 180;
+let selAz2 = 270;
+let arr2Active = false;
 let fData = [];
 let chart = null;
 let yearChart = null;
@@ -837,20 +962,28 @@ function getBlockVal(bid, type) {
   return el ? (parseFloat(el.value) || 0) : 0;
 }
 
+function getBlockHours(bid) {
+  return bid === 'night' ? 8 : 4;
+}
+
 function updateBlockSum() {
+  const consume = +document.getElementById('iConsume').value || 0;
   const total = BLOCKS.reduce((s, b) => s + getBlockVal(b.id, 'load'), 0);
   const el = document.getElementById('oBlockSum');
-  el.textContent = Math.round(total) + '%';
-  el.style.color = Math.abs(total - 100) < 1 ? '#14b8a6' : '#f87171';
+  el.textContent = total.toFixed(1) + ' / ' + consume.toFixed(1) + ' kWh';
+  el.style.color = total <= consume + 0.05 ? '#14b8a6' : '#f87171';
 }
 
 function buildBlocks() {
   const container = document.getElementById('timeBlocks');
   container.innerHTML = '';
+  const consume = +document.getElementById('iConsume').value || 10;
   BLOCKS.forEach(b => {
     const timeLabel = b.start < b.end
       ? `${b.start}:00–${b.end}:00 Uhr`
       : `${b.start}:00–0${b.end}:00 Uhr`;
+    // Default kWh = defLoad% of consume
+    const defKwh = +(consume * b.defLoad / 100).toFixed(1);
     const div = document.createElement('div');
     div.style.cssText = 'background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;';
     div.innerHTML = `
@@ -865,13 +998,13 @@ function buildBlocks() {
         <span style="font-size:11px;color:var(--muted);">%</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:11px;color:var(--muted);width:80px;flex-shrink:0;">Lastanteil</span>
-        <input type="range" id="loadR_${b.id}" min="0" max="60" step="1" value="${b.defLoad}"
-               oninput="document.getElementById('loadN_${b.id}').value=this.value;updateBlockSum()" style="flex:1;" />
-        <input type="number" id="loadN_${b.id}" min="0" max="60" step="1" value="${b.defLoad}"
-               onchange="document.getElementById('loadR_${b.id}').value=Math.min(60,Math.max(0,+this.value||0));this.value=document.getElementById('loadR_${b.id}').value;updateBlockSum()"
+        <span style="font-size:11px;color:var(--muted);width:80px;flex-shrink:0;">Verbrauch</span>
+        <input type="range" id="loadR_${b.id}" min="0" max="${consume}" step="0.1" value="${defKwh}"
+               oninput="document.getElementById('loadN_${b.id}').value=parseFloat(this.value).toFixed(1);updateBlockSum()" style="flex:1;" />
+        <input type="number" id="loadN_${b.id}" min="0" max="${consume}" step="0.1" value="${defKwh}"
+               onchange="document.getElementById('loadR_${b.id}').value=Math.min(${consume},Math.max(0,+this.value||0));this.value=parseFloat(document.getElementById('loadR_${b.id}').value).toFixed(1);updateBlockSum()"
                style="width:52px;text-align:center;padding:6px 4px;font-size:13px;font-weight:700;color:#14b8a6;" />
-        <span style="font-size:11px;color:var(--muted);">%</span>
+        <span style="font-size:11px;color:var(--muted);">kWh</span>
       </div>`;
     container.appendChild(div);
   });
@@ -989,6 +1122,29 @@ function setAzFromInput(v) {
   setAz(v);
 }
 
+function setAz2(d) {
+  d = Math.max(0, Math.min(359, Math.round(d)));
+  selAz2 = d;
+  const nearest = [0,45,90,135,180,225,270,315].reduce((a,b) => {
+    const da = Math.min(Math.abs(d-a), 360-Math.abs(d-a));
+    const db = Math.min(Math.abs(d-b), 360-Math.abs(d-b));
+    return da <= db ? a : b;
+  });
+  document.querySelectorAll('.az-btn[data-d2]').forEach(b => {
+    b.classList.toggle('active', +b.dataset.d2 === nearest);
+  });
+  document.getElementById('oAzName2').textContent = AZ_NAMES[d] || (d + '°');
+  const sl = document.getElementById('iAzSlider2');
+  const ni = document.getElementById('iAzDeg2');
+  if (sl && +sl.value !== d) sl.value = d;
+  if (ni && +ni.value !== d) ni.value = d;
+}
+
+function toggleArr2() {
+  arr2Active = document.getElementById('chkArr2').checked;
+  document.getElementById('arr2Fields').style.display = arr2Active ? 'block' : 'none';
+}
+
 function setTilt(v, btn) {
   document.getElementById('iTilt').value = v;
   document.getElementById('nTilt').value = v;
@@ -1052,15 +1208,20 @@ async function doCalc() {
   const batEff       = +document.getElementById('iBatEff').value / 100;   // roundtrip e.g. 0.90
   const batMinSoc    = +document.getElementById('iBatMinSoc').value / 100;
   const loc          = document.getElementById('iLocName').value || `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+  // Second array
+  const kwp2    = arr2Active ? +document.getElementById('iKwp2').value  : 0;
+  const tilt2   = arr2Active ? +document.getElementById('iTilt2').value : 30;
+  const kwpTotal = kwp + kwp2;
 
   const NOCT       = 45;
-  // Build per-hour consumption and shading from blocks
-  const loadSum = BLOCKS.reduce((s, b) => s + getBlockVal(b.id, 'load'), 0);
+  // Build per-hour consumption from block kWh values
+  const blockTotalKwh = BLOCKS.reduce((s, b) => s + getBlockVal(b.id, 'load'), 0);
   const hourConsArr = Array.from({length: 24}, (_, h) => {
     const bid = blockForHour(h);
-    const loadPct = loadSum > 0 ? getBlockVal(bid, 'load') / loadSum : 1/24;
+    const blockKwh = getBlockVal(bid, 'load');
     const blockHours = bid === 'night' ? 8 : 4;
-    return consume * loadPct / blockHours;
+    // If blocks are configured use them, else fall back to flat profile
+    return blockTotalKwh > 0.01 ? blockKwh / blockHours : consume / 24;
   });
   const shadeArr = Array.from({length: 24}, (_, h) => {
     const bid = blockForHour(h);
@@ -1070,7 +1231,7 @@ async function doCalc() {
   const batUsable  = batCap * (1 - batMinSoc);
   const sqrtEff    = Math.sqrt(batEff);
   gConsume = consume; gBatCap = batCap; gBatMinSoc = batMinSoc;
-  gLat = lat; gLon = lon; gKwp = kwp; gTilt = tilt; gEff = eff; gWrMax = wrMax; gTc = tc;
+  gLat = lat; gLon = lon; gKwp = kwpTotal; gTilt = tilt; gEff = eff; gWrMax = wrMax; gTc = tc;
 
   const errBox = document.getElementById('errBox');
   errBox.style.display = 'none';
@@ -1090,7 +1251,6 @@ async function doCalc() {
     const { time: T, shortwave_radiation: GHI, direct_normal_irradiance: DNI,
             diffuse_radiation: DHI, cloudcover: CC, temperature_2m: TEMP } = j.hourly;
 
-    const beta = tilt * DEG;
     const days = {};
     let totalTempLoss = 0, totalKwhBeforeTemp = 0;
 
@@ -1104,32 +1264,54 @@ async function doCalc() {
       const hour = +t.slice(11, 13) + 0.5;
       if (!days[ds]) days[ds] = { hs: [], ccSum: 0, socEnd: 0 };
 
-      // ── POA irradiance with shading ──
-      const hIdx = Math.floor(hour); // 0-23
+      // ── POA irradiance with shading — array 1 + optional array 2 ──
+      const hIdx = Math.floor(hour);
       const shadeFactor = 1 - (shadeArr[hIdx] || 0);
-      const ci  = cosAOI(lat, lon, tilt, selAz, ds, hour);
-      const poa = Math.max(0, (
-        (DNI[i]  || 0) * ci +
-        (DHI[i]  || 0) * (1 + Math.cos(beta)) / 2 +
-        (GHI[i]  || 0) * 0.2 * (1 - Math.cos(beta)) / 2
+      const ci   = cosAOI(lat, lon, tilt,  selAz,  ds, hour);
+      const beta = tilt * DEG;
+      const poa1 = Math.max(0, (
+        (DNI[i] || 0) * ci +
+        (DHI[i] || 0) * (1 + Math.cos(beta)) / 2 +
+        (GHI[i] || 0) * 0.2 * (1 - Math.cos(beta)) / 2
       ) * shadeFactor);
 
+      let poa2 = 0;
+      if (arr2Active && kwp2 > 0) {
+        const ci2   = cosAOI(lat, lon, tilt2, selAz2, ds, hour);
+        const beta2 = tilt2 * DEG;
+        poa2 = Math.max(0, (
+          (DNI[i] || 0) * ci2 +
+          (DHI[i] || 0) * (1 + Math.cos(beta2)) / 2 +
+          (GHI[i] || 0) * 0.2 * (1 - Math.cos(beta2)) / 2
+        ) * shadeFactor);
+      }
+
+      // Weighted average POA for temperature correction
+      const poaAvg = kwpTotal > 0
+        ? (poa1 * kwp + poa2 * kwp2) / kwpTotal
+        : poa1;
+
       // ── Temperature correction ──
-      const p_dc_raw = poa * kwp * eff / 100 / 1000;
+      const p_dc_raw = (poa1 * kwp + poa2 * kwp2) * eff / 100 / 1000;
       const t_air    = TEMP[i] ?? 20;
-      const t_cell   = t_air + poa * (NOCT - 20) / 800;
+      const t_cell   = t_air + poaAvg * (NOCT - 20) / 800;
       const tempFact = 1 - (tc / 100) * Math.max(0, t_cell - 25);
       const p_dc     = p_dc_raw * tempFact;
 
       if (p_dc_raw > 0) { totalKwhBeforeTemp += p_dc_raw; totalTempLoss += p_dc_raw - p_dc; }
 
-      // ── WR clipping ──
-      const produced = Math.min(p_dc, wrMax);
-      gHourlyProd.push(produced);
+      // ── DC-coupled model ──────────────────────────────────────────
+      // For DC-coupled hybrid systems (e.g. Anker SOLIX):
+      //   ac_out   = what the inverter pushes to the AC bus (≤ wrMax)
+      //   dc_bypass = excess DC that charges the battery directly, bypassing the inverter
+      // Clipping losses only occur when battery is also full/maxed out.
+      const ac_out   = Math.min(p_dc, wrMax);   // AC output this hour
+      const dc_bypass = Math.max(0, p_dc - wrMax); // surplus DC → straight to battery
+      gHourlyProd.push(p_dc);  // full DC for recommendation simulation
 
-      // ── Clear-sky reference (uncapped, no shading for reference) ──
+      // ── Clear-sky reference (array 1 only, uncapped) ──
       const poa_cs = clearSkyPOA(lat, lon, tilt, selAz, ds, hour);
-      const cs_kwh = poa_cs * kwp * eff / 100 / 1000;
+      const cs_kwh = poa_cs * kwpTotal * eff / 100 / 1000;
 
       // ── Per-hour consumption from blocks ──
       const hourCons = hourConsArr[hIdx] || 0; // kWh this hour
@@ -1138,49 +1320,78 @@ async function doCalc() {
       let batLossHour = 0;
 
       if (consume > 0) {
-        // ── Energy balance with battery ──
-        let surplus = produced - hourCons;
+        // ── DC-coupled energy balance ──────────────────────────────
+        // Step 1: AC meets load directly
+        selfDirect = Math.min(ac_out, hourCons);
+        const ac_surplus = Math.max(0, ac_out - hourCons);
+        const ac_deficit = Math.max(0, hourCons - ac_out);
 
-        if (surplus >= 0) {
-          // More production than consumption → direct self-use + charge battery
-          selfDirect = hourCons;
-          if (batCap > 0 && batSoC < batUsable) {
-            const space     = batUsable - batSoC;
-            const canCharge = Math.min(surplus, batChargeW, space / sqrtEff);
-            const stored    = canCharge * sqrtEff;   // after charge loss
-            batSoC         += stored;
-            batCharge       = canCharge;
-            batLossHour    += canCharge - stored;
+        // Step 2: Charge battery — DC bypass has priority, then AC surplus
+        // Both are limited together by batChargeW
+        let chargeLeft = batChargeW;
+        if (batCap > 0 && batSoC < batUsable) {
+          // 2a: DC bypass directly into battery (no inverter involved)
+          if (dc_bypass > 0) {
+            const space   = batUsable - batSoC;
+            const ch      = Math.min(dc_bypass, chargeLeft, space / sqrtEff);
+            const stored  = ch * sqrtEff;
+            batSoC       += stored;
+            batCharge    += ch;
+            batLossHour  += ch - stored;
             totalBatCharged += stored;
-            surplus        -= canCharge;
+            chargeLeft   -= ch;
           }
-          feedIn = Math.max(0, surplus);
-        } else {
-          // More consumption than production → use what's produced + discharge battery
-          selfDirect = produced;
-          let deficit = -surplus;
+          // 2b: AC surplus into battery (AC-coupled path)
+          if (ac_surplus > 0 && chargeLeft > 0) {
+            const space   = batUsable - batSoC;
+            const ch      = Math.min(ac_surplus, chargeLeft, space / sqrtEff);
+            const stored  = ch * sqrtEff;
+            batSoC       += stored;
+            batCharge    += ch;
+            batLossHour  += ch - stored;
+            totalBatCharged += stored;
+            chargeLeft   -= ch;
+          }
+        }
+
+        // Feed-in: AC surplus not absorbed by battery
+        feedIn = Math.max(0, ac_surplus - (batCharge - Math.min(batCharge, dc_bypass)));
+
+        // Step 3: Cover AC deficit from battery, then grid
+        if (ac_deficit > 0) {
           if (batCap > 0 && batSoC > 0) {
-            const avail       = Math.min(batSoC, batDischargeW, deficit / sqrtEff);
-            const delivered   = avail * sqrtEff;    // after discharge loss
-            batSoC           -= avail;
-            batDischarge      = delivered;
-            batLossHour      += avail - delivered;
-            totalBatDischarged+= delivered;
-            deficit          -= delivered;
+            const avail     = Math.min(batSoC, batDischargeW, ac_deficit / sqrtEff);
+            const delivered = avail * sqrtEff;
+            batSoC         -= avail;
+            batDischarge    = delivered;
+            batLossHour    += avail - delivered;
+            totalBatDischarged += delivered;
+            selfDirect     += Math.min(delivered, ac_deficit);
+            gridDraw        = Math.max(0, ac_deficit - delivered);
+          } else {
+            gridDraw = ac_deficit;
           }
-          gridDraw = Math.max(0, deficit);
         }
         totalBatLoss += batLossHour;
       } else {
-        feedIn = produced;
+        // No consumption tracking: charge battery from dc_bypass, rest = feed-in
+        if (batCap > 0 && dc_bypass > 0 && batSoC < batUsable) {
+          const space  = batUsable - batSoC;
+          const ch     = Math.min(dc_bypass, batChargeW, space / sqrtEff);
+          batSoC      += ch * sqrtEff;
+          batCharge    = ch;
+        }
+        feedIn = ac_out;
       }
+
+      const produced = p_dc; // total DC production for day totals
 
       days[ds].hs.push({
         h:           +t.slice(11, 13),
-        kwh:         +produced.toFixed(3),   // after WR clipping (energy balance)
-        kwhNc:       +p_dc.toFixed(3),        // before WR clipping (chart display)
+        kwh:         +produced.toFixed(3),   // total DC production
+        kwhNc:       +p_dc.toFixed(3),       // same (p_dc = full DC, no clip in DC-coupled)
         cs:          +cs_kwh.toFixed(3),
-        poa:         Math.round(poa),
+        poa:         Math.round(poaAvg),
         tCell:       +t_cell.toFixed(1),
         tempFact:    +tempFact.toFixed(3),
         selfDirect:  +selfDirect.toFixed(3),
@@ -1228,20 +1439,30 @@ async function doCalc() {
     document.getElementById('mBest').textContent = best.kwh.toFixed(1) + ' kWh';
     document.getElementById('mPeak').textContent = wrMax.toFixed(1) + ' kW';
 
-    // Savings
+    // Savings — use seasonal correction for annual estimate
     if (consume > 0 && price > 0) {
       const weekSelf = fData.reduce((s, d) => s + d.selfCons, 0);
       const weekSaved = +(weekSelf * price).toFixed(2);
-      const yearSaved = +(weekSaved * 52).toFixed(0);
+      // Correct annual: scale by seasonal factor
+      const curMonth = new Date().getMonth();
+      const curFactor = SEASONAL_DE[curMonth];
+      const avgFactor = SEASONAL_DE.reduce((s, v) => s + v, 0) / 12;
+      const yearSaved = Math.round(weekSelf * 52 * (avgFactor / curFactor) * price);
       document.getElementById('mSavings').textContent = weekSaved.toFixed(2) + ' €';
       document.getElementById('mSavingsYear').textContent = yearSaved + ' €';
       document.getElementById('mSavingsBox').style.display = 'block';
+      // Amortisation
+      const invest = +document.getElementById('iInvest').value;
+      calcAmort(weekSelf, price, invest);
     } else {
       document.getElementById('mSavingsBox').style.display = 'none';
+      document.getElementById('mAmortBox').style.display = 'none';
     }
     document.getElementById('fTitle').textContent = loc;
     document.getElementById('fSub').textContent   =
-      `${kwp} kWp · ${AZ_NAMES[selAz] || selAz + '°'} · ${tilt}° · WR ${wrMax} kW` +
+      `${kwp} kWp · ${AZ_NAMES[selAz] || selAz + '°'} · ${tilt}°` +
+      (arr2Active ? ` + ${kwp2} kWp · ${AZ_NAMES[selAz2] || selAz2 + '°'} · ${tilt2}°` : '') +
+      ` · WR ${wrMax} kW` +
       (batCap > 0 ? ` · 🔋 ${batCap} kWh` : '');
 
     document.getElementById('mTempNote').style.display = 'block';
@@ -1313,7 +1534,9 @@ async function doCalc() {
     if (yearChart) { yearChart.destroy(); yearChart = null; }
     showView('7d');
     calcBatReco();
-    selectDay(0);
+    // defer one tick so the browser reflows vForecast + chartSection before
+    // Chart.js reads canvas.clientWidth — otherwise it sees 0 and renders empty
+    setTimeout(function() { selectDay(0); }, 0);
 
   } catch (e) {
     let msg = 'Fehler: ' + e.message;
@@ -1334,6 +1557,123 @@ async function doCalc() {
   btn.textContent = '☀️ Prognose berechnen';
 }
 
+let amortChart = null;
+
+// ── Seasonal correction factors for Germany (DE) ─────────────────
+// Monthly ratio relative to annual average (sum = 12)
+const SEASONAL_DE = [0.28, 0.42, 0.72, 1.08, 1.35, 1.45, 1.40, 1.28, 0.98, 0.62, 0.30, 0.22];
+
+function calcAmort(weekSelf, price, invest) {
+  if (invest <= 0 || price <= 0 || weekSelf <= 0) {
+    document.getElementById('mAmortBox').style.display = 'none';
+    return;
+  }
+
+  // Correct seasonal correction:
+  // avgFactor = mean of monthly factors (annual average = 1.0 baseline)
+  // annualSelf = weekSelf × 52 × (avgFactor / curFactor)
+  const now = new Date();
+  const curMonth = now.getMonth();
+  const curFactor = SEASONAL_DE[curMonth];
+  const avgFactor = SEASONAL_DE.reduce((s, v) => s + v, 0) / 12; // ~0.842
+  const annualSelfKwh = weekSelf * 52 * (avgFactor / curFactor);
+  const annualSaved = annualSelfKwh * price;
+
+  // Add 1% annual electricity price increase
+  const priceIncrease = 0.01;
+  let cumSavings = 0;
+  const years = [];
+  const savingsLine = [];
+  const investLine = [];
+  let amortYear = null;
+
+  for (let y = 0; y <= 25; y++) {
+    years.push(y);
+    investLine.push(invest);
+    savingsLine.push(+cumSavings.toFixed(0));
+    if (cumSavings >= invest && amortYear === null) amortYear = y;
+    const yearSaved = annualSaved * Math.pow(1 + priceIncrease, y);
+    cumSavings += yearSaved;
+  }
+
+  const profit20 = savingsLine[20] - invest;
+  const amortTxt = amortYear !== null ? amortYear + ' Jahre' : '>' + 25 + ' Jahre';
+
+  document.getElementById('mAmortAnnual').textContent = Math.round(annualSaved) + ' €/Jahr';
+  document.getElementById('mAmortYears').textContent  = amortTxt;
+  document.getElementById('mAmortProfit').textContent = (profit20 >= 0 ? '+' : '') + Math.round(profit20) + ' €';
+  document.getElementById('mAmortNote').textContent =
+    `Saisonaler Korrekturfaktor (Monat ${now.toLocaleString('de',{month:'long'})}: ${curFactor}×) · +1%/Jahr Strompreissteigerung`;
+
+  const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const gc  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const tc  = isDark ? 'rgba(255,255,255,0.40)' : 'rgba(0,0,0,0.40)';
+
+  if (amortChart) { amortChart.destroy(); amortChart = null; }
+
+  amortChart = new Chart(document.getElementById('amortChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: years.map(y => y === 0 ? 'Heute' : 'J' + y),
+      datasets: [
+        {
+          label: 'Kum. Ersparnis',
+          data: savingsLine,
+          borderColor: '#14b8a6',
+          backgroundColor: 'rgba(20,184,166,0.10)',
+          borderWidth: 2.5,
+          pointRadius: 0,
+          tension: 0.4,
+          fill: false
+        },
+        {
+          label: 'Investition',
+          data: investLine,
+          borderColor: '#f87171',
+          borderWidth: 1.5,
+          borderDash: [5, 4],
+          pointRadius: 0,
+          tension: 0,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#111827', borderColor: '#1e2d45', borderWidth: 1,
+          callbacks: {
+            title: ts => ts[0].label === 'Heute' ? 'Heute' : 'Jahr ' + ts[0].label.slice(1),
+            label: ctx => '  ' + ctx.dataset.label + ': ' + ctx.raw.toFixed(0) + ' €',
+            afterBody: ts => {
+              const y = +ts[0].label.replace('J','') || 0;
+              const diff = savingsLine[y] - invest;
+              return [diff >= 0 ? `  Gewinn: +${diff.toFixed(0)} €` : `  Noch offen: ${(-diff).toFixed(0)} €`];
+            }
+          }
+        },
+        annotation: amortYear ? {
+          annotations: {
+            amort: {
+              type: 'line', xMin: amortYear, xMax: amortYear,
+              borderColor: 'rgba(20,184,166,0.5)', borderWidth: 1, borderDash: [3,3]
+            }
+          }
+        } : {}
+      },
+      scales: {
+        x: { ticks: { color: tc, font: { size: 9 }, maxTicksLimit: 10 }, grid: { color: gc } },
+        y: { beginAtZero: true, ticks: { color: tc, font: { size: 9 }, callback: v => v + ' €' }, grid: { color: gc } }
+      }
+    }
+  });
+
+  document.getElementById('mAmortBox').style.display = 'block';
+}
+
 // ── Battery sizing recommendation ──────────────────────────────
 function calcBatReco() {
   const box = document.getElementById('mRecoBox');
@@ -1346,12 +1686,12 @@ function calcBatReco() {
   }
 
   // Build block-aware hourly consumption (same as doCalc)
-  const loadSum = BLOCKS.reduce((s, b) => s + getBlockVal(b.id, 'load'), 0);
+  const blockTotalKwh = BLOCKS.reduce((s, b) => s + getBlockVal(b.id, 'load'), 0);
   const hourConsArr = Array.from({length: 24}, (_, h) => {
     const bid = blockForHour(h);
-    const loadPct = loadSum > 0 ? getBlockVal(bid, 'load') / loadSum : 1/24;
+    const blockKwh = getBlockVal(bid, 'load');
     const blockHours = bid === 'night' ? 8 : 4;
-    return gConsume * loadPct / blockHours;
+    return blockTotalKwh > 0.01 ? blockKwh / blockHours : gConsume / 24;
   });
 
   const chargeW    = +document.getElementById('iBatChargeW').value;
@@ -1362,31 +1702,48 @@ function calcBatReco() {
   const totalDemand = gConsume * 7;  // 7-day demand
   const currentCap = gBatCap;
   const priceKwh   = +document.getElementById('iPrice').value || 0.30;
-  const batPriceKwh = 250;
+  const autTarget  = Math.min(99, Math.max(50, +document.getElementById('iAutTarget').value || 80));
+  // Update heading label in forecast view
+  const recoTargetEl = document.getElementById('mRecoTarget');
+  if (recoTargetEl) recoTargetEl.textContent = autTarget;
+  // ── Market price ranges (DE, 2025/26) — must be declared before use ──
+  const modPriceLow  = 190;  // €/kWp — Budget-Module
+  const modPriceHigh = 375;  // €/kWp — Markenmodule (Aiko, REC etc.)
+  const batPriceLow  = 295;  // €/kWh — Anker SOLIX BP2700
+  const batPriceHigh = 440;  // €/kWh — kleinere Einheiten
+  const batPriceKwh = (batPriceLow + batPriceHigh) / 2; // midpoint for simulation
 
   function simCap(cap) {
     const usable = cap * (1 - minSoc);
     let soc = usable * 0.5, self = 0, draw = 0;
-    gHourlyProd.forEach(function(prod, i) {
+    gHourlyProd.forEach(function(prod_dc, i) {
       const hc = hourConsArr[i % 24];
-      const surplus = prod - hc;
-      if (surplus >= 0) {
-        self += hc;
-        if (cap > 0 && soc < usable) {
-          const ch = Math.min(surplus, chargeW, Math.max(0, usable - soc) / sqrtEff);
-          soc = Math.min(usable, soc + ch * sqrtEff);
-        }
-      } else {
-        self += prod;
+      const ac_out    = Math.min(prod_dc, gWrMax);
+      const dc_bypass = Math.max(0, prod_dc - gWrMax);
+      const ac_surplus = Math.max(0, ac_out - hc);
+      const ac_deficit = Math.max(0, hc - ac_out);
+      self += Math.min(ac_out, hc);
+
+      // Charge battery: DC bypass first, then AC surplus
+      let chargeLeft = chargeW;
+      if (cap > 0 && soc < usable) {
+        const ch1 = Math.min(dc_bypass, chargeLeft, Math.max(0, usable - soc) / sqrtEff);
+        soc = Math.min(usable, soc + ch1 * sqrtEff); chargeLeft -= ch1;
+        const ch2 = Math.min(ac_surplus, chargeLeft, Math.max(0, usable - soc) / sqrtEff);
+        soc = Math.min(usable, soc + ch2 * sqrtEff);
+      }
+
+      // Cover deficit from battery then grid
+      if (ac_deficit > 0) {
         if (cap > 0 && soc > 0) {
-          const av    = Math.min(soc, dischargeW, (-surplus) / sqrtEff);
-          const del   = av * sqrtEff;
-          soc        -= av;
-          const extra = Math.min(del, -surplus);
-          self       += extra;
-          draw       += Math.max(0, -surplus - extra);
+          const av  = Math.min(soc, dischargeW, ac_deficit / sqrtEff);
+          const del = av * sqrtEff;
+          soc      -= av;
+          const extra = Math.min(del, ac_deficit);
+          self    += extra;
+          draw    += Math.max(0, ac_deficit - extra);
         } else {
-          draw += -surplus;
+          draw += ac_deficit;
         }
       }
     });
@@ -1465,15 +1822,123 @@ function calcBatReco() {
       `Grenznutzen gering bei ${gKwp} kWp — lohnt sich nur bei günstigem Speicherpreis oder hohem Verbrauch.`;
   }
 
+  const modulePriceKwp = (modPriceLow + modPriceHigh) / 2;
+  let best100 = null;
+  const curFactor95  = SEASONAL_DE[new Date().getMonth()];
+  const avgFactor95  = SEASONAL_DE.reduce((s,v) => s+v, 0) / 12;
+
+  outer: for (let addKwp = 0; addKwp <= 15; addKwp += 0.5) {
+    for (let addBat = 0; addBat <= 30; addBat += 1) {
+      const testKwp    = gKwp + addKwp;
+      const testBat    = gBatCap + addBat;
+      const scaleFactor = testKwp / Math.max(gKwp, 0.1);
+      const testWrMax   = gWrMax * scaleFactor; // scale WR proportionally
+      const testUsable  = testBat * (1 - minSoc);
+      let soc2 = testUsable * 0.5, self2 = 0;
+
+      gHourlyProd.forEach(function(prod_dc, i) {
+        // Scale DC production, apply DC-coupled model with scaled WR
+        const scaledDc  = prod_dc * scaleFactor;
+        const scaledAc  = Math.min(scaledDc, testWrMax);
+        const dcBypass  = Math.max(0, scaledDc - testWrMax);
+        const hc        = hourConsArr[i % 24];
+        const ac_sur    = Math.max(0, scaledAc - hc);
+        const ac_def    = Math.max(0, hc - scaledAc);
+        self2 += Math.min(scaledAc, hc);
+
+        let chargeLeft2 = chargeW;
+        if (testBat > 0 && soc2 < testUsable) {
+          const ch1 = Math.min(dcBypass, chargeLeft2, Math.max(0, testUsable - soc2) / sqrtEff);
+          soc2 = Math.min(testUsable, soc2 + ch1 * sqrtEff); chargeLeft2 -= ch1;
+          const ch2 = Math.min(ac_sur, chargeLeft2, Math.max(0, testUsable - soc2) / sqrtEff);
+          soc2 = Math.min(testUsable, soc2 + ch2 * sqrtEff);
+        }
+        if (ac_def > 0) {
+          if (testBat > 0 && soc2 > 0) {
+            const av  = Math.min(soc2, dischargeW, ac_def / sqrtEff);
+            const del = av * sqrtEff;
+            soc2 -= av;
+            self2 += Math.min(del, ac_def);
+          }
+        }
+      });
+
+      const aut = Math.min(self2, totalDemand) / totalDemand * 100;
+      if (aut >= autTarget) {
+        const cost = Math.round(addKwp * modulePriceKwp + addBat * batPriceKwh);
+        if (!best100 || cost < best100.cost) {
+          best100 = { addKwp, addBat, autarky: Math.round(aut), cost };
+        }
+        break; // found min battery for this kWp — go to next kWp
+      }
+    }
+    // Stop searching more kWp once cost starts rising significantly
+    if (best100 && (addKwp * modulePriceKwp) > best100.cost * 1.5) break outer;
+  }
+
+  let reco100 = '';
+  if (best100) {
+    const parts = [];
+    const moduleWp = 480; // Aiko 480 Wp — passe an dein Modul an
+    if (best100.addKwp > 0 || best100.addBat > 0) {
+      const numModules = Math.ceil(best100.addKwp * 1000 / moduleWp);
+      const addKwpReal = +(numModules * moduleWp / 1000).toFixed(2);
+      const totalKwp   = +(gKwp + addKwpReal).toFixed(2);
+      const totalBat   = +(gBatCap + best100.addBat).toFixed(1);
+
+      // Price ranges
+      const costModLow  = Math.round(numModules * moduleWp / 1000 * modPriceLow);
+      const costModHigh = Math.round(numModules * moduleWp / 1000 * modPriceHigh);
+      const costBatLow  = Math.round(best100.addBat * batPriceLow);
+      const costBatHigh = Math.round(best100.addBat * batPriceHigh);
+      const totalLow    = costModLow + costBatLow;
+      const totalHigh   = costModHigh + costBatHigh;
+
+      // Natural language parts
+      const modulePart = best100.addKwp > 0
+        ? `<strong>${numModules} weitere${numModules === 1 ? 's' : ''} Modul${numModules > 1 ? 'e' : ''}</strong> (${addKwpReal} kWp)`
+        : '';
+      const batPart = best100.addBat > 0
+        ? `eine <strong>Speichererweiterung um ${best100.addBat} kWh</strong> auf insgesamt ${totalBat} kWh`
+        : '';
+
+      const bothParts = [modulePart, batPart].filter(Boolean).join(' sowie ');
+      const totalDesc = best100.addKwp > 0
+        ? ` Die Gesamtleistung steigt auf ${totalKwp} kWp.`
+        : '';
+
+      const extraWeekSelf = totalDemand * (autTarget / 100 - cur.autarky / 100) / 7;
+      const extraAnnual   = extraWeekSelf * 52 * (avgFactor95 / curFactor95) * priceKwh;
+      const paybackTarget = extraAnnual > 0 ? Math.round(best100.cost / extraAnnual) : '?';
+
+      reco100 = `<div style="margin-top:12px;padding:14px;background:rgba(20,184,166,0.08);border:1px solid rgba(20,184,166,0.3);border-radius:10px;font-size:13px;line-height:1.9;">
+        <p style="font-weight:700;color:#14b8a6;margin-bottom:6px;">📋 Empfehlung für ~${autTarget}% Autarkie</p>
+        <p>Um einen Autarkiegrad von ~${autTarget}% zu erreichen und deinen mittleren Tagesbedarf von <strong>${gConsume.toFixed(1)} kWh</strong> weitgehend selbst zu decken, sind ${bothParts} notwendig.${totalDesc}</p>
+        ${best100.addKwp > 0 ? `<p style="margin-top:6px;">🔲 <strong>${numModules} Modul${numModules > 1 ? 'e'  :''}</strong> (${addKwpReal} kWp): <strong>${costModLow}–${costModHigh} €</strong> <span style="color:var(--muted);font-size:11px;">(Budget-Modul bis Markenmodul)</span></p>` : ''}
+        ${best100.addBat > 0  ? `<p>🔋 <strong>+${best100.addBat} kWh Speicher</strong>: <strong>${costBatLow}–${costBatHigh} €</strong> <span style="color:var(--muted);font-size:11px;">(Basis-LFP bis BKW-Komplettspeicher)</span></p>` : ''}
+        <p style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(20,184,166,0.2);">💰 Gesamtinvestition: <strong>${totalLow}–${totalHigh} €</strong> · Amortisation ~<strong>${paybackTarget} Jahre</strong></p>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px;">Preise 2025/26 DE · ${moduleWp} Wp/Modul · Speicher: Anker SOLIX BP2700 ~297 €/kWh · kleine Einheiten ~440 €/kWh · ohne Montage &amp; Halterung</p>
+      </div>`;
+    } else {
+      reco100 = `<div style="margin-top:10px;padding:12px;background:rgba(20,184,166,0.08);border:1px solid rgba(20,184,166,0.3);border-radius:10px;font-size:13px;">
+        <strong style="color:#14b8a6;">✅ Deine aktuelle Anlage erreicht bereits ~${autTarget}% Autarkie!</strong>
+      </div>`;
+    }
+  } else {
+    reco100 = `<div style="margin-top:10px;padding:12px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.3);border-radius:10px;font-size:13px;color:var(--muted);">
+      Mit realistischen Erweiterungen (bis 15 kWp) ist ${autTarget}% Autarkie bei deinem Verbrauch von ${gConsume.toFixed(1)} kWh/Tag an diesem Standort nicht erreichbar — die Wintermonate sind zu schwach.
+    </div>`;
+  }
+
   document.getElementById('mRecoContent').innerHTML =
     `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:12px;">` +
     `<tr style="color:var(--muted);font-size:11px;border-bottom:1px solid var(--border);">` +
     `<th style="text-align:left;padding-bottom:4px;font-weight:500;">Kapazität</th>` +
     `<th style="text-align:left;padding-bottom:4px;font-weight:500;">Autarkie</th>` +
     `<th style="text-align:left;padding-bottom:4px;font-weight:500;">Netzbezug/Wo</th></tr>` +
-    rows + `</table>` + reco +
+    rows + `</table>` + reco + reco100 +
     `<p style="font-size:11px;color:var(--muted);margin-top:8px;">` +
-    `Strompreis: ${(priceKwh*100).toFixed(0)} ct/kWh · Speicherpreis: ~250 €/kWh · Lastprofil mit Zeitblöcken</p>`;
+    `Strompreis: ${(priceKwh*100).toFixed(0)} ct/kWh · Speicher: Anker SOLIX ~295–440 €/kWh · Module ${modPriceLow}–${modPriceHigh} €/kWp · Lastprofil mit Zeitblöcken</p>`;
 
   box.style.display = 'block';
 }
@@ -1503,16 +1968,16 @@ function selectDay(idx) {
   const clearSky = d.hs.map(h => +h.cs.toFixed(3));
   const upper    = d.hs.map(h => +Math.max(h.kwhNc * 1.20, 0).toFixed(3));
   const lower    = d.hs.map(h => +Math.max(h.kwhNc * 0.80, 0).toFixed(3));
-  // Build block-aware hourly consumption line
-  const loadSum = BLOCKS.reduce((s, b) => s + getBlockVal(b.id, 'load'), 0);
+  // Build block-aware hourly consumption line for chart
+  const blockTotalKwh2 = BLOCKS.reduce((s, b) => s + getBlockVal(b.id, 'load'), 0);
   const conLine = d.hs.map(h => {
     if (gConsume === 0) return 0;
     const bid = blockForHour(h.h);
-    const loadPct = loadSum > 0 ? getBlockVal(bid, 'load') / loadSum : 1/24;
+    const blockKwh = getBlockVal(bid, 'load');
     const blockHours = bid === 'night' ? 8 : 4;
-    return +(gConsume * loadPct / blockHours).toFixed(3);
+    return +(blockTotalKwh2 > 0.01 ? blockKwh / blockHours : gConsume / 24).toFixed(3);
   });
-  const hourCons = gConsume / 24; // for tooltip surplus calc
+  const hourCons = gConsume / 24;
 
   const datasets = [
     // ① Band upper edge (fills down to lower)
@@ -1802,6 +2267,7 @@ function showSetup() {
   document.getElementById('vSetup').style.display = 'block';
   if (chart) { chart.destroy(); chart = null; }
   if (yearChart) { yearChart.destroy(); yearChart = null; }
+  if (amortChart) { amortChart.destroy(); amortChart = null; }
   document.getElementById('btnYear').dataset.loaded = '';
 }
 
