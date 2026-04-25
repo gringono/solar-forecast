@@ -598,6 +598,22 @@
       Steht im Modul-Datenblatt. Mono/Poly-Si: ~0,40 % · HJT/TOPCon: ~0,25–0,30 %
     </p>
 
+    <div style="border-top:1px solid var(--border);padding-top:14px;">
+      <div class="slider-row" style="margin-bottom:6px;">
+        <span style="font-size:13px;color:var(--muted);font-weight:500;">Anlage in Betrieb seit <i class="info-btn" onclick="showTip(this,'<strong>Anlagenalter &amp; Degradation</strong><br>Solarmodule verlieren jährlich ca. 0,5% Leistung (LID + UV-Alterung). Ein 10 Jahre altes Modul liefert ~5% weniger als neu. Wird auf alle Ertragsberechnungen angewendet. Erstes Jahr: LID ca. 1–2%, danach ~0,5%/Jahr.')">?</i></span>
+        <span style="font-size:14px;font-weight:700;color:var(--accent);"><span id="oDegYears">0</span> J · –<span id="oDegPct">0.0</span>%</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
+        <input type="range" id="iDegYears" min="0" max="25" step="1" value="0"
+               oninput="sR('iDegYears','nDegYears','oDegYears',0);document.getElementById('oDegPct').textContent=(+this.value*0.5).toFixed(1);" style="flex:1;" />
+        <input type="number" id="nDegYears" min="0" max="25" step="1" value="0"
+               oninput="sNi('nDegYears','iDegYears')" onchange="sNc('nDegYears','iDegYears','oDegYears',0);document.getElementById('oDegPct').textContent=(+document.getElementById('iDegYears').value*0.5).toFixed(1);"
+               style="width:55px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:var(--accent);" />
+        <span style="font-size:13px;color:var(--muted);flex-shrink:0;">Jahre</span>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:2px;">–0,5%/Jahr · 10 Jahre = –5% Ertrag · max. –25% bei 25 Jahren</p>
+    </div>
+
     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
       <span style="font-size:13px;color:var(--muted);font-weight:500;">Tagesverbrauch (Haushalt) <i class="info-btn" onclick="showTip(this,'<strong>Tagesverbrauch</strong><br>Dein durchschnittlicher Stromverbrauch pro Tag. Richtwerte DE: 1 Person ≈ 4–6 kWh/Tag · 2 Personen ≈ 8–10 kWh/Tag · 4 Personen ≈ 13–18 kWh/Tag. 0 = deaktiviert. Die Simulation verwendet ein gleichmäßiges Lastprofil (vereinfacht).')">?</i></span>
       <span style="font-size:14px;font-weight:700;color:var(--accent);"><span id="oConsume">0</span> kWh/Tag</span>
@@ -739,7 +755,8 @@
   <p class="info-footer">
     Strahlungsdaten: Open-Meteo (DNI, DHI, GHI, T₂ₘ · stündlich)<br>
     Modell: POA nach Duffie &amp; Beckman · NOCT-Temperaturkorrektur · WR-Clipping<br>
-    Keine Registrierung · Keine API-Keys · Open Source
+    Keine Registrierung · Keine API-Keys · Open Source<br>
+    <span style="color:var(--accent);font-weight:600;">v1.2.0</span>
   </p>
 </div>
 
@@ -781,42 +798,17 @@
     </div>
   </div>
 
-  <!-- Savings metrics -->
+  <!-- Savings metrics — weekly only, annual moved to year view -->
   <div id="mSavingsBox" style="display:none;margin-bottom:16px;">
     <div class="metrics" style="margin-bottom:0;">
       <div class="metric-card" style="border-color:rgba(245,158,11,0.3);">
         <div class="metric-label">Ersparnis diese Woche</div>
         <div class="metric-value" style="color:var(--accent);" id="mSavings">—</div>
       </div>
-      <div class="metric-card" style="border-color:rgba(245,158,11,0.3);">
-        <div class="metric-label">Hochrechnung Jahr</div>
-        <div class="metric-value" style="color:var(--accent);" id="mSavingsYear">—</div>
+      <div class="metric-card" style="border-color:rgba(20,184,166,0.2);">
+        <div class="metric-label" style="font-size:11px;">Jahresprognose &amp; Amortisation</div>
+        <div class="metric-value" style="font-size:13px;color:var(--muted);">→ Jahresansicht</div>
       </div>
-    </div>
-  </div>
-
-  <!-- Amortisation chart -->
-  <div id="mAmortBox" style="display:none;margin-bottom:16px;">
-    <p style="font-size:12px;color:var(--muted);font-weight:500;margin-bottom:8px;">📊 Amortisationsverlauf</p>
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;">
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
-        <div>
-          <p style="font-size:11px;color:var(--muted);margin-bottom:3px;">Jahresersparnis</p>
-          <p style="font-size:16px;font-weight:700;color:var(--accent);" id="mAmortAnnual">—</p>
-        </div>
-        <div>
-          <p style="font-size:11px;color:var(--muted);margin-bottom:3px;">Amortisation</p>
-          <p style="font-size:16px;font-weight:700;color:#14b8a6;" id="mAmortYears">—</p>
-        </div>
-        <div>
-          <p style="font-size:11px;color:var(--muted);margin-bottom:3px;">Gewinn 20J.</p>
-          <p style="font-size:16px;font-weight:700;color:#818cf8;" id="mAmortProfit">—</p>
-        </div>
-      </div>
-      <div style="position:relative;width:100%;height:180px;">
-        <canvas id="amortChart"></canvas>
-      </div>
-      <p style="font-size:11px;color:var(--muted);margin-top:8px;" id="mAmortNote">Saisonaler Korrekturfaktor aus 7-Tage-Wetterdaten hochgerechnet</p>
     </div>
   </div>
   <div id="mSelfBox" style="display:none;margin-bottom:16px;">
@@ -879,6 +871,23 @@
 
   <div id="dayList"></div>
 
+  <!-- ── Calibration input ── -->
+  <div id="calBox" style="margin-bottom:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span style="font-size:13px;font-weight:600;">📐 Kalibrierung</span>
+      <span id="calBadge" style="display:none;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:rgba(20,184,166,0.15);color:#14b8a6;"></span>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">Tatsächlichen Ertrag eines Tages eingeben — die App verbessert die Prognose automatisch.</p>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <select id="calDaySelect" style="flex:1;padding:8px;border-radius:var(--radius-sm);border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:13px;"></select>
+      <input type="number" id="calActual" min="0" max="100" step="0.1" placeholder="kWh"
+             style="width:80px;text-align:center;padding:8px 6px;font-size:14px;font-weight:700;color:#14b8a6;border-radius:var(--radius-sm);border:1px solid var(--border2);background:var(--surface2);" />
+      <button onclick="submitCalibration()"
+              style="padding:8px 14px;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#000;font-weight:700;font-size:13px;cursor:pointer;">✓</button>
+    </div>
+    <p id="calHistory" style="font-size:11px;color:var(--muted);margin-top:8px;"></p>
+  </div>
+
   <div id="chartSection">
     <div class="card">
       <p class="chart-label" id="chartLbl">Stündlicher Verlauf</p>
@@ -922,6 +931,36 @@
       </div>
       <p style="font-size:11px;color:var(--muted);margin-top:8px;">Basis: Open-Meteo Climate API · Langjährige Monatsmittelwerte · Verschattung &amp; Lastprofil eingerechnet</p>
     </div>
+
+    <!-- Amortisation in year view -->
+    <div id="yAmortBox" style="display:none;margin-top:16px;">
+      <p style="font-size:12px;color:var(--muted);font-weight:500;margin-bottom:8px;">📊 Amortisation &amp; Rendite</p>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
+          <div>
+            <p style="font-size:11px;color:var(--muted);margin-bottom:3px;">Jahresersparnis (Basis)</p>
+            <p style="font-size:16px;font-weight:700;color:var(--accent);" id="yAmortAnnual">—</p>
+          </div>
+          <div>
+            <p style="font-size:11px;color:var(--muted);margin-bottom:3px;">Amortisation</p>
+            <p style="font-size:16px;font-weight:700;color:#14b8a6;" id="yAmortYears">—</p>
+          </div>
+          <div>
+            <p style="font-size:11px;color:var(--muted);margin-bottom:3px;">Gewinn nach 25J.</p>
+            <p style="font-size:16px;font-weight:700;color:#818cf8;" id="yAmortProfit">—</p>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:11px;color:var(--muted);">
+          <span><span style="display:inline-block;width:24px;height:2px;background:#14b8a6;vertical-align:middle;margin-right:4px;"></span>Basis (ERA5 + +1%/J. Strom)</span>
+          <span><span style="display:inline-block;width:24px;height:2px;background:rgba(20,184,166,0.3);border-top:2px dashed rgba(20,184,166,0.5);vertical-align:middle;margin-right:4px;"></span>Band: +20% / −20% Ertrag</span>
+          <span><span style="display:inline-block;width:24px;height:2px;background:#f87171;border-top:2px dashed rgba(248,113,113,0.8);vertical-align:middle;margin-right:4px;"></span>Investition</span>
+        </div>
+        <div style="position:relative;width:100%;height:220px;">
+          <canvas id="yAmortChart"></canvas>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-top:8px;" id="yAmortNote"></p>
+      </div>
+    </div>
   </div>
 
 </div><!-- /vForecast -->
@@ -935,9 +974,11 @@ let fData = [];
 let chart = null;
 let yearChart = null;
 let gConsume = 0;
+let gYearlyKwh = 0; // set after ERA5 year view loads — used for accurate annual savings
 let gBatCap = 0;
 let gBatMinSoc = 0;
 let gHourlyProd = [];
+let gClipFactor = 1.0; // actual AC/DC ratio derived from 7-day simulation
 let gLat = 51.196, gLon = 6.444, gKwp = 1.9, gTilt = 30, gEff = 80, gWrMax = 0.8, gTc = 0.40;
 
 // ── Time blocks definition ──────────────────────────────────────
@@ -1194,6 +1235,10 @@ function kwhColor(ratio) {
 
 // ── Main calculation ────────────────────────────────────────────
 async function doCalc() {
+  // Request notification permission here — this IS a user gesture context
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission(); // fire-and-forget, don't block calc
+  }
   const lat          = +document.getElementById('iLat').value;
   const lon          = +document.getElementById('iLon').value;
   const kwp          = +document.getElementById('iKwp').value;
@@ -1201,6 +1246,8 @@ async function doCalc() {
   const eff          = +document.getElementById('iEff').value;
   const wrMax        = +document.getElementById('iWr').value;
   const tc           = +document.getElementById('iTc').value;
+  const degYears     = +document.getElementById('iDegYears').value || 0;
+  const degFactor    = Math.max(0.75, 1 - degYears * 0.005); // –0.5%/year, floor at –25%
   const consume      = +document.getElementById('iConsume').value;
   const batCap       = +document.getElementById('iBat').value;
   const batChargeW   = +document.getElementById('iBatChargeW').value;
@@ -1292,7 +1339,7 @@ async function doCalc() {
         : poa1;
 
       // ── Temperature correction ──
-      const p_dc_raw = (poa1 * kwp + poa2 * kwp2) * eff / 100 / 1000;
+      const p_dc_raw = (poa1 * kwp + poa2 * kwp2) * eff / 100 / 1000 * degFactor;
       const t_air    = TEMP[i] ?? 20;
       const t_cell   = t_air + poaAvg * (NOCT - 20) / 800;
       const tempFact = 1 - (tc / 100) * Math.max(0, t_cell - 25);
@@ -1419,6 +1466,38 @@ async function doCalc() {
       };
     });
 
+    // ── Compute real clipping factor from 7-day hourly data ──────
+    // wrFactor = AC_total / DC_total — used to calibrate annual ERA5 model
+    {
+      const totalDC = gHourlyProd.reduce((s, v) => s + v, 0);
+      const totalAC = gHourlyProd.reduce((s, v) => s + Math.min(v, wrMax), 0);
+      gClipFactor = totalDC > 0 ? totalAC / totalDC : 1.0;
+    }
+
+    // ── Store today's prediction for tomorrow's calibration ──────
+    if (fData[0]) {
+      try {
+        const stored = JSON.parse(localStorage.getItem('solarTodayPred_v1') || '[]');
+        // Only store if not already saved for this date
+        if (!stored.find(e => e.ds === fData[0].ds)) {
+          stored.push({ ds: fData[0].ds, kwh: fData[0].kwh });
+          // Keep last 14 days
+          localStorage.setItem('solarTodayPred_v1', JSON.stringify(stored.slice(-14)));
+        }
+      } catch(e) {}
+    }
+
+    // ── Apply calibration factor ──────────────────────────────────
+    const calFactor = getCalFactor();
+    if (calFactor !== 1) {
+      fData.forEach(function(d) {
+        d.kwh      = +(d.kwh      * calFactor).toFixed(2);
+        d.selfCons = +(d.selfCons * calFactor).toFixed(2);
+        d.feedIn   = +(d.feedIn   * calFactor).toFixed(2);
+        d.hs.forEach(function(h) { h.kwh = +(h.kwh * calFactor).toFixed(3); });
+      });
+    }
+
     // ── Summary metrics ──
     const total          = fData.reduce((s, d) => s + d.kwh, 0);
     const maxK           = Math.max(...fData.map(d => d.kwh), 0.1);
@@ -1439,24 +1518,14 @@ async function doCalc() {
     document.getElementById('mBest').textContent = best.kwh.toFixed(1) + ' kWh';
     document.getElementById('mPeak').textContent = wrMax.toFixed(1) + ' kW';
 
-    // Savings — use seasonal correction for annual estimate
+    // Savings — weekly only, annual/amortisation now in year view
     if (consume > 0 && price > 0) {
-      const weekSelf = fData.reduce((s, d) => s + d.selfCons, 0);
+      const weekSelf  = fData.reduce((s, d) => s + d.selfCons, 0);
       const weekSaved = +(weekSelf * price).toFixed(2);
-      // Correct annual: scale by seasonal factor
-      const curMonth = new Date().getMonth();
-      const curFactor = SEASONAL_DE[curMonth];
-      const avgFactor = SEASONAL_DE.reduce((s, v) => s + v, 0) / 12;
-      const yearSaved = Math.round(weekSelf * 52 * (avgFactor / curFactor) * price);
       document.getElementById('mSavings').textContent = weekSaved.toFixed(2) + ' €';
-      document.getElementById('mSavingsYear').textContent = yearSaved + ' €';
       document.getElementById('mSavingsBox').style.display = 'block';
-      // Amortisation
-      const invest = +document.getElementById('iInvest').value;
-      calcAmort(weekSelf, price, invest);
     } else {
       document.getElementById('mSavingsBox').style.display = 'none';
-      document.getElementById('mAmortBox').style.display = 'none';
     }
     document.getElementById('fTitle').textContent = loc;
     document.getElementById('fSub').textContent   =
@@ -1534,9 +1603,19 @@ async function doCalc() {
     if (yearChart) { yearChart.destroy(); yearChart = null; }
     showView('7d');
     calcBatReco();
+    buildCalDaySelect();
+    updateCalDisplay();
+    fetchYesterdayPrediction(); // async — fetches archive data, refreshes dropdown when done
     // defer one tick so the browser reflows vForecast + chartSection before
     // Chart.js reads canvas.clientWidth — otherwise it sees 0 and renders empty
-    setTimeout(function() { selectDay(0); }, 0);
+    setTimeout(function() {
+      selectDay(0);
+      // Fire notification with today's summary and best production window
+      const todayKwh  = fData[0] ? fData[0].kwh : 0;
+      const total7d   = fData.reduce((s, d) => s + d.kwh, 0);
+      const bestWin   = fData[0] ? findBestWindow(fData[0].hs) : null;
+      fireNotification(total7d, todayKwh, bestWin, getCalFactor());
+    }, 0);
 
   } catch (e) {
     let msg = 'Fehler: ' + e.message;
@@ -1560,72 +1639,106 @@ async function doCalc() {
 let amortChart = null;
 
 // ── Seasonal correction factors for Germany (DE) ─────────────────
-// Monthly ratio relative to annual average (sum = 12)
 const SEASONAL_DE = [0.28, 0.42, 0.72, 1.08, 1.35, 1.45, 1.40, 1.28, 0.98, 0.62, 0.30, 0.22];
 
-function calcAmort(weekSelf, price, invest) {
-  if (invest <= 0 || price <= 0 || weekSelf <= 0) {
-    document.getElementById('mAmortBox').style.display = 'none';
+// ── Amortisation with confidence band ─────────────────────────────
+// annualKwh: ERA5-based annual self-consumption kWh
+// price: €/kWh, invest: € total investment
+function calcAmort(annualKwh, price, invest) {
+  const box = document.getElementById('yAmortBox');
+  if (!box) return;
+  if (invest <= 0 || price <= 0 || annualKwh <= 0) {
+    box.style.display = 'none';
     return;
   }
 
-  // Correct seasonal correction:
-  // avgFactor = mean of monthly factors (annual average = 1.0 baseline)
-  // annualSelf = weekSelf × 52 × (avgFactor / curFactor)
-  const now = new Date();
-  const curMonth = now.getMonth();
-  const curFactor = SEASONAL_DE[curMonth];
-  const avgFactor = SEASONAL_DE.reduce((s, v) => s + v, 0) / 12; // ~0.842
-  const annualSelfKwh = weekSelf * 52 * (avgFactor / curFactor);
-  const annualSaved = annualSelfKwh * price;
+  const years       = Array.from({length: 26}, (_, i) => i);  // 0–25
+  const priceBase   = 0.01;  // +1%/year electricity price increase (base)
+  const priceOpt    = 0.02;  // +2%/year (optimistic — prices rise faster)
+  const pricePess   = 0.00;  // +0%/year (pessimistic — prices flat)
+  const yieldOpt    = 1.20;  // +20% yield (better-than-average years)
+  const yieldPess   = 0.80;  // −20% yield (worse years + degradation)
 
-  // Add 1% annual electricity price increase
-  const priceIncrease = 0.01;
-  let cumSavings = 0;
-  const years = [];
-  const savingsLine = [];
-  const investLine = [];
-  let amortYear = null;
-
-  for (let y = 0; y <= 25; y++) {
-    years.push(y);
-    investLine.push(invest);
-    savingsLine.push(+cumSavings.toFixed(0));
-    if (cumSavings >= invest && amortYear === null) amortYear = y;
-    const yearSaved = annualSaved * Math.pow(1 + priceIncrease, y);
-    cumSavings += yearSaved;
+  function buildCumLine(yieldFactor, priceFactor) {
+    let cum = 0;
+    return years.map(y => {
+      const val = annualKwh * yieldFactor * price * Math.pow(1 + priceFactor, y);
+      const result = +cum.toFixed(0);
+      cum += val;
+      return result;
+    });
   }
 
-  const profit20 = savingsLine[20] - invest;
-  const amortTxt = amortYear !== null ? amortYear + ' Jahre' : '>' + 25 + ' Jahre';
+  const baseLine  = buildCumLine(1.0,      priceBase);
+  const optLine   = buildCumLine(yieldOpt, priceOpt);
+  const pessLine  = buildCumLine(yieldPess, pricePess);
+  const investLine = years.map(() => invest);
 
-  document.getElementById('mAmortAnnual').textContent = Math.round(annualSaved) + ' €/Jahr';
-  document.getElementById('mAmortYears').textContent  = amortTxt;
-  document.getElementById('mAmortProfit').textContent = (profit20 >= 0 ? '+' : '') + Math.round(profit20) + ' €';
-  document.getElementById('mAmortNote').textContent =
-    `Saisonaler Korrekturfaktor (Monat ${now.toLocaleString('de',{month:'long'})}: ${curFactor}×) · +1%/Jahr Strompreissteigerung`;
+  // Find break-even for base case
+  let amortYear = null;
+  for (let y = 0; y < baseLine.length; y++) {
+    if (baseLine[y] >= invest && amortYear === null) amortYear = y;
+  }
+
+  const profit25base = baseLine[25] - invest;
+  const profit25opt  = optLine[25]  - invest;
+  const profit25pess = pessLine[25] - invest;
+  const annualSaved  = Math.round(annualKwh * price);
+  const amortTxt     = amortYear !== null ? amortYear + ' Jahre' : '> 25 Jahre';
+
+  document.getElementById('yAmortAnnual').textContent = annualSaved + ' €/Jahr';
+  document.getElementById('yAmortYears').textContent  = amortTxt;
+  document.getElementById('yAmortProfit').textContent =
+    (profit25base >= 0 ? '+' : '') + Math.round(profit25base) + ' €' +
+    ` (${profit25pess >= 0 ? '+' : ''}${Math.round(profit25pess)}–${profit25opt >= 0 ? '+' : ''}${Math.round(profit25opt)} €)`;
+  document.getElementById('yAmortNote').textContent =
+    `Basis: ERA5-Klimadaten · +1%/J. Strompreis · Band: ±20% Ertrag + 0–2%/J. Strompreis · Degradation im pessimistischen Band enthalten`;
 
   const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
-  const gc  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-  const tc  = isDark ? 'rgba(255,255,255,0.40)' : 'rgba(0,0,0,0.40)';
+  const gc = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const tc = isDark ? 'rgba(255,255,255,0.40)' : 'rgba(0,0,0,0.40)';
 
   if (amortChart) { amortChart.destroy(); amortChart = null; }
 
-  amortChart = new Chart(document.getElementById('amortChart').getContext('2d'), {
+  amortChart = new Chart(document.getElementById('yAmortChart').getContext('2d'), {
     type: 'line',
     data: {
       labels: years.map(y => y === 0 ? 'Heute' : 'J' + y),
       datasets: [
+        // Confidence band fill (optimistic → pessimistic)
         {
-          label: 'Kum. Ersparnis',
-          data: savingsLine,
+          label: 'Optimistisch',
+          data: optLine,
+          borderColor: 'rgba(20,184,166,0.35)',
+          borderWidth: 1,
+          borderDash: [4, 3],
+          pointRadius: 0,
+          tension: 0.4,
+          fill: '+1',  // fill to next dataset (pessimistic)
+          backgroundColor: 'rgba(20,184,166,0.08)'
+        },
+        {
+          label: 'Pessimistisch',
+          data: pessLine,
+          borderColor: 'rgba(20,184,166,0.35)',
+          borderWidth: 1,
+          borderDash: [4, 3],
+          pointRadius: 0,
+          tension: 0.4,
+          fill: false
+        },
+        // Base line
+        {
+          label: 'Basis',
+          data: baseLine,
           borderColor: '#14b8a6',
-          backgroundColor: 'rgba(20,184,166,0.10)',
+          backgroundColor: 'transparent',
           borderWidth: 2.5,
           pointRadius: 0,
           tension: 0.4,
           fill: false
         },
+        // Investment line
         {
           label: 'Investition',
           data: investLine,
@@ -1645,33 +1758,69 @@ function calcAmort(weekSelf, price, invest) {
         legend: { display: false },
         tooltip: {
           backgroundColor: '#111827', borderColor: '#1e2d45', borderWidth: 1,
+          filter: item => item.datasetIndex >= 2, // only show Base + Invest in tooltip
           callbacks: {
             title: ts => ts[0].label === 'Heute' ? 'Heute' : 'Jahr ' + ts[0].label.slice(1),
-            label: ctx => '  ' + ctx.dataset.label + ': ' + ctx.raw.toFixed(0) + ' €',
+            label: ctx => {
+              if (ctx.datasetIndex === 2) return '  Basis: ' + ctx.raw + ' €';
+              if (ctx.datasetIndex === 3) return '  Investition: ' + ctx.raw + ' €';
+            },
             afterBody: ts => {
               const y = +ts[0].label.replace('J','') || 0;
-              const diff = savingsLine[y] - invest;
-              return [diff >= 0 ? `  Gewinn: +${diff.toFixed(0)} €` : `  Noch offen: ${(-diff).toFixed(0)} €`];
+              const diff = baseLine[y] - invest;
+              const lo   = pessLine[y] - invest;
+              const hi   = optLine[y]  - invest;
+              const diffTxt = diff >= 0
+                ? `  Gewinn (Basis): +${diff} €`
+                : `  Noch offen: ${-diff} €`;
+              const bandTxt = `  Band: ${lo >= 0 ? '+' : ''}${lo} bis ${hi >= 0 ? '+' : ''}${hi} €`;
+              return [diffTxt, bandTxt];
             }
           }
-        },
-        annotation: amortYear ? {
-          annotations: {
-            amort: {
-              type: 'line', xMin: amortYear, xMax: amortYear,
-              borderColor: 'rgba(20,184,166,0.5)', borderWidth: 1, borderDash: [3,3]
-            }
-          }
-        } : {}
+        }
       },
       scales: {
-        x: { ticks: { color: tc, font: { size: 9 }, maxTicksLimit: 10 }, grid: { color: gc } },
-        y: { beginAtZero: true, ticks: { color: tc, font: { size: 9 }, callback: v => v + ' €' }, grid: { color: gc } }
+        x: {
+          ticks: { color: tc, font: { size: 9 }, maxTicksLimit: 10 },
+          grid: { color: gc }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: tc, font: { size: 9 }, callback: v => v + ' €' },
+          grid: { color: gc }
+        }
       }
     }
   });
 
-  document.getElementById('mAmortBox').style.display = 'block';
+  // Draw break-even annotation manually (Chart.js annotation plugin not loaded)
+  if (amortYear !== null) {
+    const canvas  = document.getElementById('yAmortChart');
+    const origDraw = amortChart.draw.bind(amortChart);
+    amortChart.draw = function() {
+      origDraw();
+      const ctx2   = canvas.getContext('2d');
+      const meta   = amortChart.getDatasetMeta(2);
+      if (!meta.data[amortYear]) return;
+      const x = meta.data[amortYear].x;
+      const yTop = amortChart.chartArea.top;
+      const yBot = amortChart.chartArea.bottom;
+      ctx2.save();
+      ctx2.strokeStyle = 'rgba(20,184,166,0.6)';
+      ctx2.lineWidth   = 1;
+      ctx2.setLineDash([3, 3]);
+      ctx2.beginPath();
+      ctx2.moveTo(x, yTop);
+      ctx2.lineTo(x, yBot);
+      ctx2.stroke();
+      ctx2.fillStyle = '#14b8a6';
+      ctx2.font      = '10px sans-serif';
+      ctx2.fillText('Break-even J' + amortYear, x + 4, yTop + 12);
+      ctx2.restore();
+    };
+  }
+
+  box.style.display = 'block';
 }
 
 // ── Battery sizing recommendation ──────────────────────────────
@@ -2182,12 +2331,20 @@ async function loadYearView() {
          getBlockVal('evening','shade') * 2) / 14
       ) / 100;
 
-      const wrFactor = Math.min(1, gWrMax / Math.max(0.01, gKwp * gEff / 100));
+      // Use real clipping factor from 7-day simulation if available,
+      // otherwise fall back to a conservative statistical estimate
+      const dcPeak   = gKwp * gEff / 100; // kW peak DC
+      const dcAcRatio = dcPeak / Math.max(0.01, gWrMax);
+      // Statistical clipping loss for annual estimate when 7-day data not yet loaded:
+      // ~8% loss per 0.1 above DC:AC = 1.0 (empirical, conservative)
+      const fallbackClip = dcAcRatio > 1 ? Math.max(0.6, 1 - (dcAcRatio - 1) * 0.12) : 1.0;
+      const wrFactor = gClipFactor < 1.0 ? gClipFactor : fallbackClip;
       const kwh = radMonthKwh * tiltFactor * gKwp * (gEff / 100) * tempFact * shadeFact * wrFactor;
       monthlyKwh.push(+kwh.toFixed(1));
     }
 
     const yearTotal = monthlyKwh.reduce((s, v) => s + v, 0);
+    gYearlyKwh = yearTotal; // store for amortisation recalculation
     const bestIdx  = monthlyKwh.indexOf(Math.max(...monthlyKwh));
     const worstIdx = monthlyKwh.indexOf(Math.min(...monthlyKwh));
 
@@ -2200,8 +2357,13 @@ async function loadYearView() {
       const yearSelf   = yearTotal * selfRatio;
       const yearSaved  = +(yearSelf * price).toFixed(0);
       document.getElementById('ySavings').textContent = yearSaved + ' €';
+      // Amortisation with confidence band — ERA5-based
+      const invest = +document.getElementById('iInvest').value;
+      calcAmort(yearSelf, price, invest);
     } else {
       document.getElementById('ySavings').textContent = price > 0 ? '—' : 'Strompreis eingeben';
+      const yAmort = document.getElementById('yAmortBox');
+      if (yAmort) yAmort.style.display = 'none';
     }
 
     // Chart
@@ -2272,7 +2434,7 @@ function showSetup() {
 }
 
 setAz(180);
-buildBlocks();
+// buildBlocks() is called via loadSettings() at the end of the second script block
 </script>
 
 <div id="tipBox"></div>
@@ -2303,6 +2465,320 @@ document.addEventListener('click', function(e) {
     box.style.display = 'none'; box._src = null;
   }
 });
+
+// ── Push Notifications ───────────────────────────────────────────
+function requestNotifPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+async function ensureNotifPermission() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  const result = await Notification.requestPermission();
+  return result === 'granted';
+}
+
+function findBestWindow(hs) {
+  // Find the 4-hour window with highest production for today
+  if (!hs || hs.length < 4) return null;
+  let best = { start: 0, kwh: 0 };
+  for (let i = 0; i <= hs.length - 4; i++) {
+    const sum = hs.slice(i, i + 4).reduce((s, h) => s + h.kwh, 0);
+    if (sum > best.kwh) best = { start: hs[i].h, kwh: sum };
+  }
+  return best.kwh > 0.1 ? best : null;
+}
+
+async function fireNotification(total7d, todayKwh, bestWindow, calFactor) {
+  const ok = await ensureNotifPermission();
+  if (!ok) return;
+  const cal = calFactor !== 1 ? ` (kalibriert ×${calFactor.toFixed(2)})` : '';
+  const win = bestWindow
+    ? ` · Großverbraucher: ${bestWindow.start}–${bestWindow.start + 4} Uhr`
+    : '';
+  new Notification('☀️ Solar Prognose', {
+    body: `Heute ~${todayKwh.toFixed(1)} kWh · 7 Tage ~${total7d.toFixed(1)} kWh${cal}${win}`,
+    icon: 'icon-192.png'
+  });
+}
+
+// ── Calibration ──────────────────────────────────────────────────
+const CAL_KEY = 'solarCalibration_v1';
+const CAL_MAX = 30; // keep last 30 entries
+
+function loadCalEntries() {
+  try { return JSON.parse(localStorage.getItem(CAL_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+
+function saveCalEntries(entries) {
+  try { localStorage.setItem(CAL_KEY, JSON.stringify(entries.slice(-CAL_MAX))); }
+  catch(e) {}
+}
+
+function getCalFactor() {
+  const entries = loadCalEntries();
+  if (entries.length < 2) return 1;
+  const avg = entries.reduce((s, e) => s + e.ratio, 0) / entries.length;
+  return Math.max(0.5, Math.min(2.0, avg)); // clamp to sane range
+}
+
+function updateCalDisplay() {
+  const entries = loadCalEntries();
+  const badge = document.getElementById('calBadge');
+  const hist  = document.getElementById('calHistory');
+  if (!badge || !hist) return;
+  if (entries.length >= 2) {
+    const f = getCalFactor();
+    badge.style.display = 'inline';
+    badge.textContent   = `Kalibriert ×${f.toFixed(2)} (${entries.length} Einträge)`;
+  } else {
+    badge.style.display = 'none';
+  }
+  if (entries.length > 0) {
+    const last = entries.slice(-3).reverse().map(e =>
+      `${e.date}: ${e.actual.toFixed(1)} kWh (Modell ${e.predicted.toFixed(1)})`
+    ).join(' · ');
+    hist.textContent = 'Letzte Einträge: ' + last;
+  } else {
+    hist.textContent = 'Noch keine Einträge — mindestens 2 nötig für Kalibrierung.';
+  }
+}
+
+async function fetchYesterdayPrediction() {
+  if (!gLat || !gKwp) return;
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const ds = yesterday.toISOString().slice(0, 10);
+
+  try {
+    const stored = JSON.parse(localStorage.getItem('solarTodayPred_v1') || '[]');
+    if (stored.find(e => e.ds === ds)) return;
+  } catch(e) {}
+
+  try {
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${gLat}&longitude=${gLon}` +
+      `&start_date=${ds}&end_date=${ds}` +
+      `&hourly=shortwave_radiation,direct_normal_irradiance,diffuse_radiation,temperature_2m` +
+      `&timezone=auto`;
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const j   = await res.json();
+    const { shortwave_radiation: GHI, direct_normal_irradiance: DNI,
+            diffuse_radiation: DHI, temperature_2m: TEMP } = j.hourly;
+
+    const tilt  = gTilt, eff = gEff, wrMax = gWrMax, tc = gTc;
+    const NOCT  = 45;
+    const degYears  = +document.getElementById('iDegYears').value || 0;
+    const degFactor = Math.max(0.75, 1 - degYears * 0.005);
+    const beta      = tilt * DEG;
+    let totalKwh    = 0;
+
+    for (let i = 0; i < GHI.length; i++) {
+      const hour = i % 24;
+      const ci   = cosAOI(gLat, gLon, tilt, selAz, ds, hour);
+      const poa  = Math.max(0,
+        (DNI[i]||0) * ci +
+        (DHI[i]||0) * (1 + Math.cos(beta)) / 2 +
+        (GHI[i]||0) * 0.2 * (1 - Math.cos(beta)) / 2
+      );
+      const p_dc_raw = poa * gKwp * eff / 100 / 1000 * degFactor;
+      const t_air    = TEMP[i] ?? 20;
+      const t_cell   = t_air + poa * (NOCT - 20) / 800;
+      const tFact    = 1 - (tc / 100) * Math.max(0, t_cell - 25);
+      totalKwh      += Math.min(p_dc_raw * tFact, wrMax);
+    }
+
+    const kwh    = +totalKwh.toFixed(2);
+    const stored = JSON.parse(localStorage.getItem('solarTodayPred_v1') || '[]');
+    stored.push({ ds, kwh });
+    localStorage.setItem('solarTodayPred_v1', JSON.stringify(stored.slice(-14)));
+    buildCalDaySelect();
+  } catch(e) {}
+}
+
+function buildCalDaySelect() {
+  const sel = document.getElementById('calDaySelect');
+  const btn = document.getElementById('calBox').querySelector('button');
+  if (!sel) return;
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // Past days from current 7-day forecast
+  const forecastPast = (fData || []).filter(d => d.ds < todayStr);
+
+  // Stored predictions from previous calc runs (yesterday, day before etc.)
+  let storedPast = [];
+  try {
+    storedPast = JSON.parse(localStorage.getItem('solarTodayPred_v1') || '[]')
+      .filter(e => e.ds < todayStr)
+      .filter(e => !forecastPast.find(d => d.ds === e.ds)); // no duplicates
+  } catch(e) {}
+
+  // Merge and sort descending (newest first)
+  const allPast = [
+    ...forecastPast.map(d => ({ ds: d.ds, kwh: d.kwh, fIdx: fData.indexOf(d) })),
+    ...storedPast.map(e => ({ ds: e.ds, kwh: e.kwh, fIdx: -1 }))
+  ].sort((a, b) => b.ds.localeCompare(a.ds));
+
+  if (allPast.length === 0) {
+    sel.innerHTML = '<option value="">— Noch keine vergangenen Tage —</option>';
+    btn.disabled = true;
+    return;
+  }
+  btn.disabled = false;
+  sel.innerHTML = allPast.map(e =>
+    `<option value="${e.fIdx}|${e.ds}|${e.kwh}">${fmtDate(e.ds)} (Modell: ${e.kwh.toFixed(1)} kWh)</option>`
+  ).join('');
+}
+
+function submitCalibration() {
+  const sel    = document.getElementById('calDaySelect');
+  const inp    = document.getElementById('calActual');
+  const actual = +inp.value;
+  if (!actual || actual <= 0 || !sel.value) return;
+
+  // Option value format: "fIdx|ds|kwh"
+  const parts     = sel.value.split('|');
+  const ds        = parts[1];
+  const predicted = +parts[2];
+
+  if (!ds || predicted < 0.1) { alert('Ungültiger Eintrag.'); return; }
+  const entries = loadCalEntries();
+  // Replace if same date already exists
+  const existing = entries.findIndex(e => e.date === ds);
+  if (existing >= 0) entries.splice(existing, 1);
+  entries.push({ date: ds, predicted, actual, ratio: actual / predicted });
+  saveCalEntries(entries);
+  inp.value = '';
+  updateCalDisplay();
+}
+
+
+const LS_KEY = 'solarForecastSettings_v1';
+
+// IDs of all static inputs (range, number, checkbox)
+const STATIC_INPUTS = [
+  'iLat','iLon','iLocName',
+  'iKwp','nKwp','iTilt','nTilt','iAzSlider','iAzDeg',
+  'chkArr2','iKwp2','nKwp2','iTilt2','nTilt2','iAzSlider2','iAzDeg2',
+  'iEff','nEff',
+  'iWr','nWr','iTc','nTc',
+  'iConsume','nConsume',
+  'iBat','nBat','iBatChargeW','iBatDischargeW','iBatEff','iBatMinSoc',
+  'iPrice','nPrice',
+  'iInvest','nInvest',
+  'iAutTarget','nAutTarget',
+  'iDegYears','nDegYears'
+];
+
+function saveSettings() {
+  try {
+    const data = {};
+    STATIC_INPUTS.forEach(function(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      data[id] = el.type === 'checkbox' ? el.checked : el.value;
+    });
+    // Save time block values (dynamically created)
+    const blockData = {};
+    BLOCKS.forEach(function(b) {
+      const sr = document.getElementById('shadeR_' + b.id);
+      const lr = document.getElementById('loadR_' + b.id);
+      if (sr) blockData['shade_' + b.id] = sr.value;
+      if (lr) blockData['load_'  + b.id] = lr.value;
+    });
+    data._blocks = blockData;
+    localStorage.setItem(LS_KEY, JSON.stringify(data));
+  } catch(e) {}
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+
+    // Restore static inputs
+    STATIC_INPUTS.forEach(function(id) {
+      if (!(id in data)) return;
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.type === 'checkbox') {
+        el.checked = data[id];
+      } else {
+        el.value = data[id];
+      }
+    });
+
+    // Trigger display-value spans — map: [inputId, spanId, decimals]
+    [['iKwp','oKwp',1],['iTilt','oTilt',0],['iEff','oEff',0],
+     ['iWr','oWr',1],['iTc','oTc',2],['iConsume','oConsume',1],
+     ['iBat','oBat',1],['iPrice','oPrice',2],['iInvest','oInvest',0],
+     ['iAutTarget','oAutTarget',0],['iDegYears','oDegYears',0],
+     ['iKwp2','oKwp2',1],['iTilt2','oTilt2',0]]
+      .forEach(function(t) {
+        const inp = document.getElementById(t[0]);
+        const out = document.getElementById(t[1]);
+        if (inp && out) out.textContent = parseFloat(inp.value).toFixed(t[2]);
+      });
+
+    // Re-run setAz so azimuth label + compass are correct
+    if (typeof setAz  === 'function') setAz( +document.getElementById('iAzDeg').value  || 180);
+    if (typeof setAz2 === 'function') setAz2(+document.getElementById('iAzDeg2').value || 270);
+
+    // Restore second array panel via toggleArr2 so arr2Active is set correctly
+    const chk = document.getElementById('chkArr2');
+    if (chk) toggleArr2();
+
+    // Store block data for use in buildBlocks
+    if (data._blocks) window._savedBlocks = data._blocks;
+    return true;
+  } catch(e) { return false; }
+}
+
+// Patch buildBlocks to restore saved block values after rendering
+const _origBuildBlocks = buildBlocks;
+buildBlocks = function() {
+  _origBuildBlocks();
+  if (window._savedBlocks) {
+    BLOCKS.forEach(function(b) {
+      const sv = window._savedBlocks['shade_' + b.id];
+      const lv = window._savedBlocks['load_'  + b.id];
+      if (sv != null) {
+        const sr = document.getElementById('shadeR_' + b.id);
+        const sn = document.getElementById('shadeN_' + b.id);
+        if (sr) sr.value = sv;
+        if (sn) sn.value = sv;
+      }
+      if (lv != null) {
+        const lr = document.getElementById('loadR_' + b.id);
+        const ln = document.getElementById('loadN_' + b.id);
+        if (lr) lr.value = lv;
+        if (ln) ln.value = parseFloat(lv).toFixed(1);
+      }
+    });
+    updateBlockSum();
+  }
+};
+
+// Auto-save on any input/change in the setup view
+document.getElementById('vSetup').addEventListener('input',  saveSettings);
+document.getElementById('vSetup').addEventListener('change', saveSettings);
+
+// Restore on load
+loadSettings();
+buildBlocks();
+// Restore degradation % display after settings load
+(function() {
+  const y = +document.getElementById('iDegYears').value || 0;
+  const p = document.getElementById('oDegPct');
+  if (p) p.textContent = (y * 0.5).toFixed(1);
+})();
+// Ask for notification permission when user clicks calculate (via ensureNotifPermission in fireNotification)
 </script>
 
 <script>
