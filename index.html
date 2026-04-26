@@ -753,10 +753,10 @@
   <button class="calc-btn" id="btnCalc" onclick="doCalc()">☀️ Prognose berechnen</button>
 
   <p class="info-footer">
-    Strahlungsdaten: Open-Meteo (DNI, DHI, GHI, T₂ₘ · stündlich)<br>
-    Modell: POA nach Duffie &amp; Beckman · NOCT-Temperaturkorrektur · WR-Clipping<br>
-    Keine Registrierung · Keine API-Keys · Open Source<br>
-    <span style="color:var(--accent);font-weight:600;">v1.3.0</span>
+    Strahlungsdaten: Open-Meteo (DNI, DHI, GHI, T₂ₘ · stündlich) · Modell: DWD ICON-D2/EU<br>
+    POA nach Duffie &amp; Beckman · NOCT-Temperaturkorrektur · DC-gekoppelte Batteriesimulation<br>
+    Keine Registrierung · Keine API-Keys · Open Source · Wetterdaten: Open-Meteo (CC BY 4.0)<br>
+    <span style="color:var(--accent);font-weight:600;">v1.4.0</span>
   </p>
 </div>
 
@@ -1298,7 +1298,7 @@ async function doCalc() {
   btn.textContent = '⏳ Lade Wetterdaten…';
 
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    const url = `https://api.open-meteo.com/v1/dwd-icon?latitude=${lat}&longitude=${lon}` +
       `&hourly=shortwave_radiation,direct_normal_irradiance,diffuse_radiation,cloudcover,temperature_2m` +
       `&timezone=auto&forecast_days=7`;
 
@@ -2430,7 +2430,7 @@ async function loadYearView() {
 
     document.getElementById('yearLegend').innerHTML =
       `<span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#f59e0b;"></span>Über Jahresdurchschnitt</span>` +
-      `<span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#fb923c;"></span>Unter Jahresdurchschnitt</span>` +
+      `<span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#b45309;"></span>Unter Jahresdurchschnitt</span>` +
       `<span style="font-size:10px;color:var(--muted);margin-left:4px;">Basis: ERA5 ${year}</span>`;
 
     yearChart = new Chart(document.getElementById('yearChart').getContext('2d'), {
@@ -2440,7 +2440,7 @@ async function loadYearView() {
         datasets: [{
           label: 'kWh',
           data: monthlyKwh,
-          backgroundColor: monthlyKwh.map(v => v >= avg ? '#f59e0b' : '#fb923c'),
+          backgroundColor: monthlyKwh.map(v => v >= avg ? '#f59e0b' : '#b45309'),
           borderRadius: 4,
           borderSkipped: false
         }]
@@ -2917,16 +2917,18 @@ function loadSettings() {
       }
     });
 
-    // Trigger display-value spans — map: [inputId, spanId, decimals]
-    [['iKwp','oKwp',1],['iTilt','oTilt',0],['iEff','oEff',0],
-     ['iWr','oWr',1],['iTc','oTc',2],['iConsume','oConsume',1],
-     ['iBat','oBat',1],['iPrice','oPrice',2],['iInvest','oInvest',0],
-     ['iAutTarget','oAutTarget',0],['iDegYears','oDegYears',0],
-     ['iKwp2','oKwp2',1],['iTilt2','oTilt2',0]]
+    // Trigger display-value spans — read from number input (not slider) to avoid step-snap
+    // Map: [sliderId, numberId, spanId, decimals]
+    [['iKwp','nKwp','oKwp',1],['iTilt','nTilt','oTilt',0],['iEff','nEff','oEff',0],
+     ['iWr','nWr','oWr',1],['iTc','nTc','oTc',2],['iConsume','nConsume','oConsume',1],
+     ['iBat','nBat','oBat',1],['iPrice','nPrice','oPrice',2],['iInvest','nInvest','oInvest',0],
+     ['iAutTarget','nAutTarget','oAutTarget',0],['iDegYears','nDegYears','oDegYears',0],
+     ['iKwp2','nKwp2','oKwp2',1],['iTilt2','nTilt2','oTilt2',0]]
       .forEach(function(t) {
-        const inp = document.getElementById(t[0]);
-        const out = document.getElementById(t[1]);
-        if (inp && out) out.textContent = parseFloat(inp.value).toFixed(t[2]);
+        // Prefer number input value (exact) over slider value (may snap to step)
+        const num = document.getElementById(t[1]);
+        const out = document.getElementById(t[2]);
+        if (num && out) out.textContent = parseFloat(num.value).toFixed(t[3]);
       });
 
     // Re-run setAz so azimuth label + compass are correct
