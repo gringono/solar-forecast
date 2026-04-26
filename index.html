@@ -865,8 +865,19 @@
     <div id="mRecoContent" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-size:13px;line-height:1.75;color:var(--text);"></div>
   </div>
 
-  <p style="font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:500;">
-    7-Tage-Prognose · Tipp: Tag antippen für Stundenverlauf
+  <p style="font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:500;display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+    <span>7-Tage-Prognose · Tipp: Tag antippen für Stundenverlauf ·</span>
+    <i class="info-btn" style="font-size:9px;width:auto;border-radius:10px;padding:0 6px;height:16px;" onclick="showTip(this,
+      '<strong>Erklärung der Tageswerte</strong><br><br>' +
+      '<strong>Zahl rechts oben (kWh)</strong> — PV-Ertrag des Tages: gesamte erzeugte Energie deiner Anlage.<br><br>' +
+      '<strong>Wetterbedingung</strong> — Beschreibung der Wetterlage (z.B. Sonnig, Leicht bewölkt, Bedeckt). Abgeleitet aus dem Tagesdurchschnitt der Wolkenbedeckung.<br><br>' +
+      '<strong>Bewölkung %</strong> — Tagesdurchschnitt der Wolkenbedeckung laut Open-Meteo.<br><br>' +
+      '<strong>Aut. %</strong> — Autarkiegrad: wie viel % deines Tagesverbrauchs du aus eigenen Quellen (PV + Akku) gedeckt hast.<br><br>' +
+      '<strong>🔋 %</strong> — Akkustand (SoC) am Ende des Tages.<br><br>' +
+      '<strong>EV kWh</strong> — Eigenverbrauch gesamt: PV-Direktverbrauch + Akku-Entladung. Kann größer als der PV-Ertrag sein wenn der Akku Energie aus Vortagen beisteuert.<br><br>' +
+      '<strong>Einsp. kWh</strong> — Einspeisung ins Netz: Überschuss der weder verbraucht noch gespeichert werden konnte.<br><br>' +
+      '<strong>Bezug kWh</strong> — Netzbezug: Energie die du zusätzlich aus dem Netz ziehen musstest weil PV + Akku nicht gereicht haben.<br><br>' +
+      '<strong>Fortschrittsbalken</strong> — Grün: Eigenverbrauch · Gesamtlänge: PV-Ertrag relativ zum besten Tag der Woche.')">? Legende</i>
   </p>
 
   <div id="dayList"></div>
@@ -2492,16 +2503,36 @@ function showTip(btn, text) {
   box.innerHTML = text;
   box.style.display = 'block';
   box._src = btn;
-  const r = btn.getBoundingClientRect();
+
   const bw = Math.min(300, window.innerWidth - 32);
-  let left = r.left;
-  if (left + bw > window.innerWidth - 8) left = window.innerWidth - bw - 8;
-  left = Math.max(8, left);
-  let top = r.bottom + 8;
-  if (top + 120 > window.innerHeight) top = r.top - 130;
-  box.style.left = left + 'px';
-  box.style.top = top + 'px';
   box.style.width = bw + 'px';
+  box.style.left  = '0px';
+  box.style.top   = '0px';
+
+  // After render, measure actual height and position correctly
+  requestAnimationFrame(function() {
+    const bh = box.offsetHeight;
+    const r  = btn.getBoundingClientRect();
+
+    // Horizontal: anchor to button, clamp to viewport
+    let left = r.left;
+    if (left + bw > window.innerWidth - 8) left = window.innerWidth - bw - 8;
+    left = Math.max(8, left);
+
+    // Vertical: if popup fits below button use that, else above
+    // If neither fits, center in viewport
+    let top = r.bottom + 8;
+    if (top + bh > window.innerHeight - 8) {
+      top = r.top - bh - 8;
+    }
+    if (top < 8 || bh > window.innerHeight * 0.7) {
+      // Too tall or off top — center in viewport
+      top = Math.max(8, (window.innerHeight - bh) / 2);
+    }
+
+    box.style.left = left + 'px';
+    box.style.top  = top  + 'px';
+  });
 }
 document.addEventListener('click', function(e) {
   if (!e.target.classList.contains('info-btn')) {
