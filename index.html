@@ -1503,12 +1503,12 @@ async function doCalc() {
     // ── Store today's prediction for tomorrow's calibration ──────
     if (fData[0]) {
       try {
-        const stored = JSON.parse(localStorage.getItem('solarTodayPred_v1') || '[]');
+        const stored = JSON.parse(localStorage.getItem('solarTodayPred_v2') || '[]');
         // Only store if not already saved for this date
         if (!stored.find(e => e.ds === fData[0].ds)) {
           stored.push({ ds: fData[0].ds, kwh: fData[0].kwh });
           // Keep last 14 days
-          localStorage.setItem('solarTodayPred_v1', JSON.stringify(stored.slice(-14)));
+          localStorage.setItem('solarTodayPred_v2', JSON.stringify(stored.slice(-14)));
         }
       } catch(e) {}
     }
@@ -2758,7 +2758,7 @@ async function fetchYesterdayPrediction() {
   const ds = yesterday.toISOString().slice(0, 10);
 
   try {
-    const stored = JSON.parse(localStorage.getItem('solarTodayPred_v1') || '[]');
+    const stored = JSON.parse(localStorage.getItem('solarTodayPred_v2') || '[]');
     if (stored.find(e => e.ds === ds)) return;
   } catch(e) {}
 
@@ -2796,9 +2796,9 @@ async function fetchYesterdayPrediction() {
     }
 
     const kwh    = +totalKwh.toFixed(2);
-    const stored = JSON.parse(localStorage.getItem('solarTodayPred_v1') || '[]');
+    const stored = JSON.parse(localStorage.getItem('solarTodayPred_v2') || '[]');
     stored.push({ ds, kwh });
-    localStorage.setItem('solarTodayPred_v1', JSON.stringify(stored.slice(-14)));
+    localStorage.setItem('solarTodayPred_v2', JSON.stringify(stored.slice(-14)));
     buildCalDaySelect();
   } catch(e) {}
 }
@@ -2816,7 +2816,7 @@ function buildCalDaySelect() {
   // Stored predictions from previous calc runs (yesterday, day before etc.)
   let storedPast = [];
   try {
-    storedPast = JSON.parse(localStorage.getItem('solarTodayPred_v1') || '[]')
+    storedPast = JSON.parse(localStorage.getItem('solarTodayPred_v2') || '[]')
       .filter(e => e.ds < todayStr)
       .filter(e => !forecastPast.find(d => d.ds === e.ds)); // no duplicates
   } catch(e) {}
