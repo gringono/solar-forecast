@@ -756,7 +756,7 @@
     Strahlungsdaten: Open-Meteo (DNI, DHI, GHI, T₂ₘ · stündlich)<br>
     Modell: POA nach Duffie &amp; Beckman · NOCT-Temperaturkorrektur · WR-Clipping<br>
     Keine Registrierung · Keine API-Keys · Open Source<br>
-    <span style="color:var(--accent);font-weight:600;">v1.2.0</span>
+    <span style="color:var(--accent);font-weight:600;">v1.3.0</span>
   </p>
 </div>
 
@@ -874,7 +874,7 @@
   <!-- ── Calibration input ── -->
   <div id="calBox" style="margin-bottom:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-      <span style="font-size:13px;font-weight:600;">📐 Kalibrierung</span>
+      <span style="font-size:13px;font-weight:600;">📐 Kalibrierung <i class="info-btn" onclick="showTip(this,'<strong>Kalibrierung</strong><br>Du gibst den tatsächlichen Tagesertrag deiner Anlage ein. Die App vergleicht ihn mit dem Modellwert für denselben Tag (POA + Wetterdaten) und berechnet einen Korrekturfaktor.<br><br>Dieser Faktor korrigiert systematische Abweichungen: falsch eingestellte Verschattung, Kabelverluste, Modulverschmutzung, WR-Wirkungsgrad.<br><br>Ab 2 Einträgen wird die Prognose automatisch angepasst. Ab ~10–15 Einträgen über verschiedene Wetterlagen wird der Faktor stabil und aussagekräftig.')">?</i></span>
       <span id="calBadge" style="display:none;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:rgba(20,184,166,0.15);color:#14b8a6;"></span>
     </div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">Tatsächlichen Ertrag eines Tages eingeben — die App verbessert die Prognose automatisch.</p>
@@ -1446,9 +1446,20 @@ async function doCalc() {
         batDischarge:+batDischarge.toFixed(3),
         feedIn:      +feedIn.toFixed(3),
         gridDraw:    +gridDraw.toFixed(3),
-        soc:         batCap > 0 ? Math.round((batMinSoc * batCap + batSoC) / batCap * 100) : 0
+        soc:         batCap > 0 ? Math.round((batMinSoc * batCap + batSoC) / batCap * 100) : 0,
+        cloud:       CC[i] || 0
       });
       days[ds].ccSum   += (CC[i] || 0);
+      // Only track temperature during daytime hours (6–21 Uhr) for meaningful range
+      const hourOfDay = i % 24;
+      if (hourOfDay >= 6 && hourOfDay <= 21) {
+        days[ds].tempSum  = (days[ds].tempSum  || 0) + (TEMP[i] || 20);
+        days[ds].tempMax  = Math.max(days[ds].tempMax  || -99, TEMP[i] || 20);
+        days[ds].tempMin  = Math.min(days[ds].tempMin  ||  99, TEMP[i] || 20);
+        days[ds].tempCnt  = (days[ds].tempCnt  || 0) + 1;
+      }
+      days[ds].poaSum  = (days[ds].poaSum  || 0) + (poaAvg || 0);
+      days[ds].poaCnt  = (days[ds].poaCnt  || 0) + 1;
       days[ds].socEnd   = batCap > 0 ? Math.round((batMinSoc * batCap + batSoC) / batCap * 100) : 0;
     });
 
@@ -1458,6 +1469,10 @@ async function doCalc() {
         ds,
         kwh:      +d.hs.reduce((s, h) => s + h.kwh, 0).toFixed(2),
         cloud:    Math.round(d.ccSum / d.hs.length),
+        tempMax:  d.tempMax != null ? +d.tempMax.toFixed(1) : null,
+        tempMin:  d.tempMin != null && d.tempMin < 98 ? +d.tempMin.toFixed(1) : null,
+        tempAvg:  d.tempCnt  ? +(d.tempSum / d.tempCnt).toFixed(1) : null,
+        poaAvgDay: d.poaCnt ? Math.round(d.poaSum / d.poaCnt) : 0,
         selfCons: +totalSelfConsDay.toFixed(2),
         feedIn:   +d.hs.reduce((s, h) => s + h.feedIn, 0).toFixed(2),
         gridDraw: +d.hs.reduce((s, h) => s + h.gridDraw, 0).toFixed(2),
@@ -1564,7 +1579,7 @@ async function doCalc() {
     fData.forEach((d, i) => {
       const ratio   = d.kwh / maxK;
       const col     = kwhColor(ratio);
-      const selfPct = d.kwh > 0 && consume > 0 ? Math.round(d.selfCons / d.kwh * 100) : 0;
+      const selfPct = gConsume > 0 ? Math.round(Math.min(d.selfCons, gConsume) / gConsume * 100) : 0;
       const el = document.createElement('div');
       el.className = 'day-card';
       el.innerHTML = `
@@ -1572,7 +1587,7 @@ async function doCalc() {
           <div>
             <div class="day-date">${fmtDate(d.ds)}</div>
             <div class="day-cloud">${cloudText(d.cloud)} · ${d.cloud}%${
-              consume > 0 ? ` · EV ${selfPct}%` : ''}${
+              consume > 0 ? ` · Aut. ${selfPct}%` : ''}${
               batCap > 0 && consume > 0 ? ` · 🔋 ${d.socEnd}%` : ''}</div>
           </div>
           <div>
@@ -1593,7 +1608,10 @@ async function doCalc() {
           <span>&#9632; ${d.feedIn.toFixed(2)} kWh Einsp.</span>
           <span>&#9632; ${d.gridDraw.toFixed(2)} kWh Bezug</span>
         </div>` : ''}`;
-      el.addEventListener('click', () => selectDay(i));
+      el.addEventListener('click', (e) => {
+        selectDay(i);
+        showWxPopup(fData[i], el);
+      });
       dayList.appendChild(el);
     });
 
@@ -2184,8 +2202,21 @@ function selectDay(idx) {
     });
   }
 
+  // ⑥ Cloud cover bars (secondary y-axis, 0–100%)
+  const cloudData = d.hs.map(h => h.cloud || 0);
+  datasets.unshift({  // unshift = rendered behind everything else
+    type: 'bar', label: 'Bewölkung',
+    data: cloudData,
+    yAxisID: 'yCloud',
+    backgroundColor: 'rgba(148,163,184,0.18)',
+    borderColor: 'transparent',
+    borderWidth: 0,
+    order: 10
+  });
+
   // ── Custom legend ──
   const legDefs = [
+    { color: 'rgba(148,163,184,0.35)', dash: false, label: 'Bewölkung %', square: true },
     { color: '#93c5fd', dash: true,  label: 'Klarer Himmel (theoret. Max.)' },
     { color: '#f59e0b', dash: false, label: 'Prognose (POA + Wetterdaten)' },
     { color: 'rgba(245,158,11,0.35)', dash: false, label: 'Prognoseband ±20%', square: true }
@@ -2226,6 +2257,7 @@ function selectDay(idx) {
           callbacks: {
             title: function(ts) { return ts[0].label + ' Uhr'; },
             label: function(ctx) {
+              if (ctx.dataset.label === 'Bewölkung') return '  Bewölkung: ' + ctx.raw + '%';
               if (ctx.raw === 0) return null;
               return '  ' + ctx.dataset.label + ': ' + (+ctx.raw).toFixed(3) + ' kWh';
             },
@@ -2260,6 +2292,17 @@ function selectDay(idx) {
           beginAtZero: true,
           ticks: { color: tc, font: { size: 10 }, callback: function(v) { return v.toFixed(2); } },
           grid: { color: gc }
+        },
+        yCloud: {
+          position: 'right',
+          min: 0, max: 100,
+          ticks: {
+            color: 'rgba(148,163,184,0.5)',
+            font: { size: 9 },
+            callback: function(v) { return v + '%'; },
+            maxTicksLimit: 5
+          },
+          grid: { display: false }
         }
       }
     }
@@ -2438,6 +2481,7 @@ setAz(180);
 </script>
 
 <div id="tipBox"></div>
+<div id="wxPopup" style="display:none;position:fixed;z-index:200;background:#111827;border:1px solid #1e3a5f;border-radius:12px;padding:14px 16px;box-shadow:0 8px 32px rgba(0,0,0,0.6);max-width:280px;font-size:13px;line-height:1.8;color:#e2e8f0;cursor:pointer;" onclick="hideWxPopup()"></div>
 
 <script>
 function showTip(btn, text) {
@@ -2466,7 +2510,87 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// ── Push Notifications ───────────────────────────────────────────
+// ── Weather popup on day card click ──────────────────────────────
+function weatherIcon(cloud) {
+  if (cloud <= 10)  return '☀️';
+  if (cloud <= 30)  return '🌤️';
+  if (cloud <= 60)  return '⛅';
+  if (cloud <= 80)  return '🌥️';
+  return '☁️';
+}
+
+function showWxPopup(d, cardEl) {
+  const popup = document.getElementById('wxPopup');
+  if (!popup) return;
+
+  const peakHour = d.hs.reduce((best, h) => h.kwh > best.kwh ? h : best, d.hs[0] || {h:0,kwh:0});
+  const totalProd = d.kwh;
+
+  // selfCons = PV direct + battery discharge — can exceed PV production
+  // Show PV-direct and battery separately to avoid confusion
+  const selfDirect  = d.hs.reduce((s, h) => s + (h.selfDirect || 0), 0);
+  const batDischDay = d.hs.reduce((s, h) => s + (h.batDischarge || 0), 0);
+  const autarky = gConsume > 0
+    ? Math.round(Math.min(d.selfCons, gConsume) / gConsume * 100)
+    : null;
+
+  const tempStr = d.tempMax != null ? `max. ${d.tempMax}°C` : '—';
+
+  let html = `<div style="font-weight:700;font-size:14px;margin-bottom:8px;">
+    ${weatherIcon(d.cloud)} ${fmtDate(d.ds)}</div>`;
+  html += `<div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;">`;
+
+  const rows = [
+    ['☁️ Bewölkung',      d.cloud + '%'],
+    ['🌡️ Temp. (6–21 Uhr)', tempStr],
+    ['☀️ Ø Einstrahlung',  d.poaAvgDay + ' W/m²'],
+    ['⚡ Ertrag',          totalProd.toFixed(2) + ' kWh'],
+    ['🕐 Ertragspeak',     peakHour.h != null ? peakHour.h + ':00 Uhr' : '—'],
+  ];
+  if (gConsume > 0) {
+    rows.push(['🏠 PV direkt',     selfDirect.toFixed(1) + ' kWh']);
+    if (batDischDay > 0.05) rows.push(['🔋 Akku-Entladung', batDischDay.toFixed(1) + ' kWh']);
+    if (autarky !== null)   rows.push(['📊 Autarkie',        autarky + '%']);
+  }
+  if (d.gridDraw > 0.05) rows.push(['🔌 Netzbezug',  d.gridDraw.toFixed(1) + ' kWh']);
+  if (d.feedIn   > 0.05) rows.push(['↗️ Einspeisung', d.feedIn.toFixed(1) + ' kWh']);
+  rows.push(['💬 Tippen zum Schließen', '']);
+
+  rows.forEach(r => {
+    html += `<span style="color:#94a3b8;">${r[0]}</span><span style="font-weight:600;">${r[1]}</span>`;
+  });
+  html += '</div>';
+
+  popup.innerHTML = html;
+  popup.style.display = 'block';
+
+  // Position near card — position:fixed is viewport-relative, NOT document-relative
+  // getBoundingClientRect() already returns viewport coords → no scrollX/Y needed
+  requestAnimationFrame(function() {
+    const r  = cardEl.getBoundingClientRect();
+    const pw = Math.min(280, window.innerWidth - 16);
+    let left = r.left;
+    if (left + pw + 8 > window.innerWidth) left = window.innerWidth - pw - 8;
+    left = Math.max(8, left);
+    let top = r.bottom + 6;
+    const popH = popup.offsetHeight || 240;
+    if (top + popH > window.innerHeight - 8) top = r.top - popH - 6;
+    top = Math.max(8, top);
+    popup.style.left  = left + 'px';
+    popup.style.top   = top  + 'px';
+    popup.style.width = pw   + 'px';
+  });
+}
+
+function hideWxPopup() {
+  const p = document.getElementById('wxPopup');
+  if (p) p.style.display = 'none';
+}
+
+document.addEventListener('click', function(e) {
+  // Close wx popup when clicking outside a day card AND outside the popup itself
+  if (!e.target.closest('.day-card') && !e.target.closest('#wxPopup')) hideWxPopup();
+});
 function requestNotifPermission() {
   if ('Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission();
@@ -2526,11 +2650,18 @@ function getCalFactor() {
   return Math.max(0.5, Math.min(2.0, avg)); // clamp to sane range
 }
 
+function fmtDateShort(ds) {
+  // ds = 'YYYY-MM-DD' → 'DD.MM.YYYY'
+  if (!ds || ds.length < 10) return ds;
+  return ds.slice(8,10) + '.' + ds.slice(5,7) + '.' + ds.slice(0,4);
+}
+
 function updateCalDisplay() {
   const entries = loadCalEntries();
   const badge = document.getElementById('calBadge');
   const hist  = document.getElementById('calHistory');
   if (!badge || !hist) return;
+
   if (entries.length >= 2) {
     const f = getCalFactor();
     badge.style.display = 'inline';
@@ -2538,14 +2669,55 @@ function updateCalDisplay() {
   } else {
     badge.style.display = 'none';
   }
+
   if (entries.length > 0) {
-    const last = entries.slice(-3).reverse().map(e =>
-      `${e.date}: ${e.actual.toFixed(1)} kWh (Modell ${e.predicted.toFixed(1)})`
-    ).join(' · ');
-    hist.textContent = 'Letzte Einträge: ' + last;
+    const last = entries[entries.length - 1];
+    hist.innerHTML =
+      `Letzter Eintrag: <strong>${fmtDateShort(last.date)}</strong> · ` +
+      `${last.actual.toFixed(1)} kWh (Modell: ${last.predicted.toFixed(1)} kWh) &nbsp;` +
+      `<span onclick="toggleCalDetails()" style="color:var(--accent);cursor:pointer;text-decoration:underline;font-size:11px;" id="calDetailsBtn">Details anzeigen</span>` +
+      ` &nbsp;<span onclick="resetCalibration()" style="color:#f87171;cursor:pointer;text-decoration:underline;font-size:11px;">Zurücksetzen</span>` +
+      `<div id="calDetails" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">` +
+        `<table style="width:100%;border-collapse:collapse;font-size:11px;">` +
+          `<thead><tr style="color:var(--muted);">` +
+            `<th style="text-align:left;padding:3px 6px 3px 0;">Datum</th>` +
+            `<th style="text-align:right;padding:3px 4px;">Erzeugt</th>` +
+            `<th style="text-align:right;padding:3px 4px;">Prognose</th>` +
+            `<th style="text-align:right;padding:3px 0;">Differenz</th>` +
+          `</tr></thead>` +
+          `<tbody>` +
+          entries.slice().reverse().map(e => {
+            const diff = e.actual - e.predicted;
+            const diffStr = (diff >= 0 ? '+' : '') + diff.toFixed(1) + ' kWh';
+            const diffColor = diff >= 0 ? '#14b8a6' : '#f87171';
+            return `<tr style="border-top:1px solid rgba(255,255,255,0.05);">` +
+              `<td style="padding:3px 6px 3px 0;color:var(--muted);">${fmtDateShort(e.date)}</td>` +
+              `<td style="text-align:right;padding:3px 4px;font-weight:600;">${e.actual.toFixed(1)} kWh</td>` +
+              `<td style="text-align:right;padding:3px 4px;color:var(--muted);">${e.predicted.toFixed(1)} kWh</td>` +
+              `<td style="text-align:right;padding:3px 0;font-weight:600;color:${diffColor};">${diffStr}</td>` +
+            `</tr>`;
+          }).join('') +
+          `</tbody>` +
+        `</table>` +
+      `</div>`;
   } else {
     hist.textContent = 'Noch keine Einträge — mindestens 2 nötig für Kalibrierung.';
   }
+}
+
+function toggleCalDetails() {
+  const el  = document.getElementById('calDetails');
+  const btn = document.getElementById('calDetailsBtn');
+  if (!el) return;
+  const open = el.style.display === 'block';
+  el.style.display  = open ? 'none' : 'block';
+  btn.textContent   = open ? 'Details anzeigen' : 'Details ausblenden';
+}
+
+function resetCalibration() {
+  if (!confirm('Alle Kalibriereinträge löschen?')) return;
+  localStorage.removeItem(CAL_KEY);
+  updateCalDisplay();
 }
 
 async function fetchYesterdayPrediction() {
