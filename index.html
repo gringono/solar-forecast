@@ -740,9 +740,25 @@
     </div>
   </div>
 
-  <!-- Zeitblöcke: Verschattung + Lastprofil -->
+  <!-- Stündliche Verschattung 8–20 Uhr -->
   <div class="card">
-    <span class="label">⏱️ Zeitblöcke — Verschattung &amp; Lastprofil <i class="info-btn" onclick="showTip(this,'<strong>Zeitblöcke</strong><br>Definiere für jeden Tagesabschnitt wie stark deine Module verschattet sind und welchen Anteil deines Tagesverbrauchs du in diesem Zeitraum nutzt. Verschattung 0% = keine Einschränkung, 100% = kein Ertrag. Lastanteile sollten zusammen 100% ergeben.')">?</i></span>
+    <span class="label">🌣 Stündliche Verschattung <i class="info-btn" onclick="showTip(this,'<strong>Stündliche Verschattung</strong><br>Gib für jede Stunde von 8–20 Uhr an wie stark deine Module verschattet sind. 0% = keine Verschattung, 100% = kein Ertrag. Außerhalb dieses Zeitfensters wird automatisch 100% angenommen (Nacht/früher Morgen/später Abend).<br><br>Vorlagen: Schnell das typische Profil für deinen Standort laden.')">?</i></span>
+
+    <!-- Preset buttons -->
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
+      <button onclick="applyShadePreset('none')"    style="padding:5px 10px;font-size:11px;border-radius:var(--radius-sm);border:1px solid var(--border2);background:var(--surface2);color:var(--text);cursor:pointer;">☀️ Keine Verschattung</button>
+      <button onclick="applyShadePreset('morning')" style="padding:5px 10px;font-size:11px;border-radius:var(--radius-sm);border:1px solid var(--border2);background:var(--surface2);color:var(--text);cursor:pointer;">🌅 Morgen verschattet</button>
+      <button onclick="applyShadePreset('evening')" style="padding:5px 10px;font-size:11px;border-radius:var(--radius-sm);border:1px solid var(--border2);background:var(--surface2);color:var(--text);cursor:pointer;">🌆 Abend verschattet</button>
+      <button onclick="applyShadePreset('custom')"  style="padding:5px 10px;font-size:11px;border-radius:var(--radius-sm);border:1px solid var(--accent-border);background:var(--accent-bg);color:var(--accent);cursor:pointer;">📋 Mein Profil (Lars)</button>
+    </div>
+
+    <!-- Hourly sliders 8–20 -->
+    <div id="hourlyShadeGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px 12px;"></div>
+  </div>
+
+  <!-- Zeitblöcke: Lastprofil -->
+  <div class="card">
+    <span class="label">⏱️ Lastprofil <i class="info-btn" onclick="showTip(this,'<strong>Lastprofil</strong><br>Verteile deinen Tagesverbrauch auf die Zeitabschnitte. Die Summe sollte deinem Tagesverbrauch entsprechen. Hilft der Batteriesimulation zu berechnen wann Eigenverbrauch und Netzbezug anfallen.')">?</i></span>
     <div id="blockSum" style="font-size:12px;margin-bottom:10px;padding:6px 10px;border-radius:var(--radius-sm);background:var(--surface2);display:flex;justify-content:space-between;">
       <span style="color:var(--muted);">Verbrauch-Summe:</span>
       <span id="oBlockSum" style="font-weight:700;color:var(--accent);">0 / 0 kWh</span>
@@ -756,7 +772,7 @@
     Strahlungsdaten: Open-Meteo (DNI, DHI, GHI, T₂ₘ · stündlich) · Modell: DWD ICON-D2/EU<br>
     POA nach Duffie &amp; Beckman · NOCT-Temperaturkorrektur · DC-gekoppelte Batteriesimulation<br>
     Keine Registrierung · Keine API-Keys · Open Source · Wetterdaten: Open-Meteo (CC BY 4.0)<br>
-    <span style="color:var(--accent);font-weight:600;">v1.4.0</span>
+    <span style="color:var(--accent);font-weight:600;">v1.5.0</span>
   </p>
 </div>
 
@@ -993,6 +1009,79 @@ let gClipFactor = 1.0; // actual AC/DC ratio derived from 7-day simulation
 let gLat = 51.196, gLon = 6.444, gKwp = 1.9, gTilt = 30, gEff = 80, gWrMax = 0.8, gTc = 0.40;
 
 // ── Time blocks definition ──────────────────────────────────────
+const SHADE_HOURS = [8,9,10,11,12,13,14,15,16,17,18,19,20];
+
+function buildHourlyShadeGrid() {
+  const grid = document.getElementById('hourlyShadeGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  SHADE_HOURS.forEach(h => {
+    const saved = getHourlyShade(h);
+    grid.innerHTML += `
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:11px;color:var(--muted);width:34px;flex-shrink:0;font-weight:600;">${h}:00</span>
+        <input type="range" id="shadeH_${h}" min="0" max="100" step="5" value="${saved}"
+               oninput="document.getElementById('shadeHN_${h}').value=this.value;saveHourlyShade()"
+               style="flex:1;height:6px;" />
+        <input type="number" id="shadeHN_${h}" min="0" max="100" step="5" value="${saved}"
+               onchange="document.getElementById('shadeH_${h}').value=Math.min(100,Math.max(0,+this.value||0));this.value=document.getElementById('shadeH_${h}').value;saveHourlyShade()"
+               style="width:44px;text-align:center;padding:4px;font-size:12px;font-weight:700;color:var(--accent);border-radius:var(--radius-sm);border:1px solid var(--border2);background:var(--surface2);" />
+        <span style="font-size:11px;color:var(--muted);">%</span>
+      </div>`;
+  });
+}
+
+function getHourlyShade(h) {
+  try {
+    const d = JSON.parse(localStorage.getItem('solarHourlyShade_v1') || '{}');
+    return d[h] != null ? d[h] : 0;
+  } catch(e) { return 0; }
+}
+
+function saveHourlyShade() {
+  try {
+    const d = {};
+    SHADE_HOURS.forEach(h => {
+      const el = document.getElementById('shadeH_' + h);
+      if (el) d[h] = +el.value;
+    });
+    localStorage.setItem('solarHourlyShade_v1', JSON.stringify(d));
+  } catch(e) {}
+}
+
+function getHourlyShadeArr() {
+  // Returns array [0..23] with shade fraction (0–1) for each hour
+  // Hours outside 8–20: 100% shading (no production)
+  return Array.from({length: 24}, (_, h) => {
+    if (h < 8 || h > 20) return 1.0;
+    const el = document.getElementById('shadeH_' + h);
+    const v  = el ? +el.value : getHourlyShade(h);
+    return v / 100;
+  });
+}
+
+// Preset profiles
+const SHADE_PRESETS = {
+  none:    {8:0,9:0,10:0,11:0,12:0,13:0,14:0,15:0,16:0,17:0,18:0,19:0,20:0},
+  morning: {8:100,9:80,10:50,11:20,12:0,13:0,14:0,15:0,16:0,17:0,18:0,19:0,20:0},
+  evening: {8:0,9:0,10:0,11:0,12:0,13:0,14:0,15:0,16:0,17:20,18:60,19:90,20:100},
+  // Lars: 6-8 nix, 8-10:30 Rampe, 10:30-18 peak, 18-19 Abnahme, 19+ weg
+  custom:  {8:100,9:60,10:30,11:5,12:0,13:0,14:0,15:0,16:0,17:0,18:40,19:90,20:100}
+};
+
+function applyShadePreset(name) {
+  const preset = SHADE_PRESETS[name];
+  if (!preset) return;
+  SHADE_HOURS.forEach(h => {
+    const v = preset[h] != null ? preset[h] : 0;
+    const r = document.getElementById('shadeH_'  + h);
+    const n = document.getElementById('shadeHN_' + h);
+    if (r) r.value = v;
+    if (n) n.value = v;
+  });
+  saveHourlyShade();
+}
+
 const BLOCKS = [
   { id: 'night',   label: '🌙 Nacht',        icon: '🌙', start: 22, end: 6,  defLoad: 8,  defShade: 100 },
   { id: 'morning', label: '🌅 Morgens',       icon: '🌅', start: 6,  end: 10, defLoad: 18, defShade: 0   },
@@ -1031,33 +1120,21 @@ function buildBlocks() {
   container.innerHTML = '';
   const consume = +document.getElementById('iConsume').value || 10;
   BLOCKS.forEach(b => {
+    if (b.id === 'night') return; // skip night block — negligible solar relevance
     const timeLabel = b.start < b.end
       ? `${b.start}:00–${b.end}:00 Uhr`
       : `${b.start}:00–0${b.end}:00 Uhr`;
-    // Default kWh = defLoad% of consume
     const defKwh = +(consume * b.defLoad / 100).toFixed(1);
     const div = document.createElement('div');
-    div.style.cssText = 'background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;';
+    div.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;';
     div.innerHTML = `
-      <p style="font-size:13px;font-weight:600;margin-bottom:10px;">${b.label} <span style="font-size:11px;color:var(--muted);font-weight:400;">${timeLabel}</span></p>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <span style="font-size:11px;color:var(--muted);width:80px;flex-shrink:0;">Verschattung</span>
-        <input type="range" id="shadeR_${b.id}" min="0" max="100" step="5" value="${b.defShade}"
-               oninput="document.getElementById('shadeN_${b.id}').value=this.value" style="flex:1;" />
-        <input type="number" id="shadeN_${b.id}" min="0" max="100" step="5" value="${b.defShade}"
-               onchange="document.getElementById('shadeR_${b.id}').value=Math.min(100,Math.max(0,+this.value||0));this.value=document.getElementById('shadeR_${b.id}').value"
-               style="width:52px;text-align:center;padding:6px 4px;font-size:13px;font-weight:700;color:var(--accent);" />
-        <span style="font-size:11px;color:var(--muted);">%</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:11px;color:var(--muted);width:80px;flex-shrink:0;">Verbrauch</span>
-        <input type="range" id="loadR_${b.id}" min="0" max="${consume}" step="0.1" value="${defKwh}"
-               oninput="document.getElementById('loadN_${b.id}').value=parseFloat(this.value).toFixed(1);updateBlockSum()" style="flex:1;" />
-        <input type="number" id="loadN_${b.id}" min="0" max="${consume}" step="0.1" value="${defKwh}"
-               onchange="document.getElementById('loadR_${b.id}').value=Math.min(${consume},Math.max(0,+this.value||0));this.value=parseFloat(document.getElementById('loadR_${b.id}').value).toFixed(1);updateBlockSum()"
-               style="width:52px;text-align:center;padding:6px 4px;font-size:13px;font-weight:700;color:#14b8a6;" />
-        <span style="font-size:11px;color:var(--muted);">kWh</span>
-      </div>`;
+      <span style="font-size:12px;color:var(--muted);white-space:nowrap;width:110px;flex-shrink:0;">${b.icon} ${timeLabel}</span>
+      <input type="range" id="loadR_${b.id}" min="0" max="${consume}" step="0.1" value="${defKwh}"
+             oninput="document.getElementById('loadN_${b.id}').value=parseFloat(this.value).toFixed(1);updateBlockSum()" style="flex:1;" />
+      <input type="number" id="loadN_${b.id}" min="0" max="${consume}" step="0.1" value="${defKwh}"
+             onchange="document.getElementById('loadR_${b.id}').value=Math.min(${consume},Math.max(0,+this.value||0));this.value=parseFloat(document.getElementById('loadR_${b.id}').value).toFixed(1);updateBlockSum()"
+             style="width:52px;text-align:center;padding:6px 4px;font-size:13px;font-weight:700;color:#14b8a6;" />
+      <span style="font-size:11px;color:var(--muted);flex-shrink:0;">kWh</span>`;
     container.appendChild(div);
   });
   updateBlockSum();
@@ -1281,10 +1358,8 @@ async function doCalc() {
     // If blocks are configured use them, else fall back to flat profile
     return blockTotalKwh > 0.01 ? blockKwh / blockHours : consume / 24;
   });
-  const shadeArr = Array.from({length: 24}, (_, h) => {
-    const bid = blockForHour(h);
-    return getBlockVal(bid, 'shade') / 100;
-  });
+  // ── Stündliche Verschattung (8–20 Uhr, Rest = 100%) ─────────────
+  const shadeArr = getHourlyShadeArr();
   const price = +document.getElementById('iPrice').value;
   const batUsable  = batCap * (1 - batMinSoc);
   const sqrtEff    = Math.sqrt(batEff);
@@ -1506,21 +1581,23 @@ async function doCalc() {
         const stored = JSON.parse(localStorage.getItem('solarTodayPred_v2') || '[]');
         // Only store if not already saved for this date
         if (!stored.find(e => e.ds === fData[0].ds)) {
-          stored.push({ ds: fData[0].ds, kwh: fData[0].kwh });
+          stored.push({ ds: fData[0].ds, kwh: fData[0].kwh, cloud: fData[0].cloud || 0 });
           // Keep last 14 days
           localStorage.setItem('solarTodayPred_v2', JSON.stringify(stored.slice(-14)));
         }
       } catch(e) {}
     }
 
-    // ── Apply calibration factor ──────────────────────────────────
-    const calFactor = getCalFactor();
-    if (calFactor !== 1) {
+    // ── Apply weather-dependent calibration factor ────────────────
+    const calFactor = getCalFactor(); // global — for badge display
+    if (calFactor !== 1 || true) { // always check per-day factor
       fData.forEach(function(d) {
-        d.kwh      = +(d.kwh      * calFactor).toFixed(2);
-        d.selfCons = +(d.selfCons * calFactor).toFixed(2);
-        d.feedIn   = +(d.feedIn   * calFactor).toFixed(2);
-        d.hs.forEach(function(h) { h.kwh = +(h.kwh * calFactor).toFixed(3); });
+        const dayFactor = getCalFactorForCloud(d.cloud);
+        if (dayFactor === 1) return;
+        d.kwh      = +(d.kwh      * dayFactor).toFixed(2);
+        d.selfCons = +(d.selfCons * dayFactor).toFixed(2);
+        d.feedIn   = +(d.feedIn   * dayFactor).toFixed(2);
+        d.hs.forEach(function(h) { h.kwh = +(h.kwh * dayFactor).toFixed(3); });
       });
     }
 
@@ -2662,7 +2739,16 @@ async function fireNotification(total7d, todayKwh, bestWindow, calFactor) {
 
 // ── Calibration ──────────────────────────────────────────────────
 const CAL_KEY = 'solarCalibration_v1';
-const CAL_MAX = 30; // keep last 30 entries
+const CAL_MAX = 30;
+
+// Weather category from cloud cover %
+function cloudCategory(cloud) {
+  if (cloud <= 25)  return 'sunny';   // ≤25% → sonnig
+  if (cloud <= 65)  return 'cloudy';  // 26–65% → bewölkt
+  return 'overcast';                   // >65% → bedeckt
+}
+
+const CAT_LABELS = { sunny: '☀️ Sonnig', cloudy: '⛅ Bewölkt', overcast: '☁️ Bedeckt' };
 
 function loadCalEntries() {
   try { return JSON.parse(localStorage.getItem(CAL_KEY) || '[]'); }
@@ -2674,11 +2760,39 @@ function saveCalEntries(entries) {
   catch(e) {}
 }
 
+// Returns factor for a given cloud% — uses category-specific factor if enough data, else global
+function getCalFactorForCloud(cloud) {
+  const entries = loadCalEntries();
+  if (entries.length < 2) return 1;
+  const cat = cloudCategory(cloud);
+  const catEntries = entries.filter(e => e.cat === cat);
+  // Need at least 2 entries in category for category-specific factor
+  if (catEntries.length >= 2) {
+    const avg = catEntries.reduce((s, e) => s + e.ratio, 0) / catEntries.length;
+    return Math.max(0.5, Math.min(2.0, avg));
+  }
+  // Fall back to global factor
+  return getCalFactor();
+}
+
 function getCalFactor() {
   const entries = loadCalEntries();
   if (entries.length < 2) return 1;
   const avg = entries.reduce((s, e) => s + e.ratio, 0) / entries.length;
-  return Math.max(0.5, Math.min(2.0, avg)); // clamp to sane range
+  return Math.max(0.5, Math.min(2.0, avg));
+}
+
+function getCalFactorByCat() {
+  const entries = loadCalEntries();
+  const cats = { sunny: [], cloudy: [], overcast: [] };
+  entries.forEach(e => { if (cats[e.cat]) cats[e.cat].push(e.ratio); });
+  const result = {};
+  Object.keys(cats).forEach(c => {
+    result[c] = cats[c].length >= 2
+      ? Math.max(0.5, Math.min(2.0, cats[c].reduce((s,v)=>s+v,0)/cats[c].length))
+      : null;
+  });
+  return result;
 }
 
 function fmtDateShort(ds) {
@@ -2694,9 +2808,15 @@ function updateCalDisplay() {
   if (!badge || !hist) return;
 
   if (entries.length >= 2) {
-    const f = getCalFactor();
+    const f    = getCalFactor();
+    const cats = getCalFactorByCat();
+    const catStr = Object.entries(cats)
+      .filter(([,v]) => v !== null)
+      .map(([c,v]) => `${CAT_LABELS[c]} ×${v.toFixed(2)}`)
+      .join(' · ');
     badge.style.display = 'inline';
-    badge.textContent   = `Kalibriert ×${f.toFixed(2)} (${entries.length} Einträge)`;
+    badge.textContent   = catStr || `Kalibriert ×${f.toFixed(2)} (${entries.length} Einträge)`;
+    badge.title         = `Global ×${f.toFixed(2)} · ${entries.length} Einträge`;
   } else {
     badge.style.display = 'none';
   }
@@ -2765,13 +2885,13 @@ async function fetchYesterdayPrediction() {
   try {
     const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${gLat}&longitude=${gLon}` +
       `&start_date=${ds}&end_date=${ds}` +
-      `&hourly=shortwave_radiation,direct_normal_irradiance,diffuse_radiation,temperature_2m` +
+      `&hourly=shortwave_radiation,direct_normal_irradiance,diffuse_radiation,temperature_2m,cloudcover` +
       `&timezone=auto`;
     const res = await fetch(url);
     if (!res.ok) return;
     const j   = await res.json();
     const { shortwave_radiation: GHI, direct_normal_irradiance: DNI,
-            diffuse_radiation: DHI, temperature_2m: TEMP } = j.hourly;
+            diffuse_radiation: DHI, temperature_2m: TEMP, cloudcover: CC_arch } = j.hourly;
 
     const tilt  = gTilt, eff = gEff, wrMax = gWrMax, tc = gTc;
     const NOCT  = 45;
@@ -2796,8 +2916,9 @@ async function fetchYesterdayPrediction() {
     }
 
     const kwh    = +totalKwh.toFixed(2);
+    const cloudAvg = CC_arch ? Math.round(CC_arch.reduce((s,v)=>s+(v||0),0)/CC_arch.length) : 0;
     const stored = JSON.parse(localStorage.getItem('solarTodayPred_v2') || '[]');
-    stored.push({ ds, kwh });
+    stored.push({ ds, kwh, cloud: cloudAvg });
     localStorage.setItem('solarTodayPred_v2', JSON.stringify(stored.slice(-14)));
     buildCalDaySelect();
   } catch(e) {}
@@ -2823,8 +2944,8 @@ function buildCalDaySelect() {
 
   // Merge and sort descending (newest first)
   const allPast = [
-    ...forecastPast.map(d => ({ ds: d.ds, kwh: d.kwh, fIdx: fData.indexOf(d) })),
-    ...storedPast.map(e => ({ ds: e.ds, kwh: e.kwh, fIdx: -1 }))
+    ...forecastPast.map(d => ({ ds: d.ds, kwh: d.kwh, cloud: d.cloud || 0, fIdx: fData.indexOf(d) })),
+    ...storedPast.map(e => ({ ds: e.ds, kwh: e.kwh, cloud: e.cloud || 0, fIdx: -1 }))
   ].sort((a, b) => b.ds.localeCompare(a.ds));
 
   if (allPast.length === 0) {
@@ -2833,9 +2954,11 @@ function buildCalDaySelect() {
     return;
   }
   btn.disabled = false;
-  sel.innerHTML = allPast.map(e =>
-    `<option value="${e.fIdx}|${e.ds}|${e.kwh}">${fmtDate(e.ds)} (Modell: ${e.kwh.toFixed(1)} kWh)</option>`
-  ).join('');
+  sel.innerHTML = allPast.map(e => {
+    const cloud = e.cloud != null ? e.cloud : 0;
+    const catLabel = CAT_LABELS[cloudCategory(cloud)] || '';
+    return `<option value="${e.fIdx}|${e.ds}|${e.kwh}|${cloud}">${fmtDate(e.ds)} · ${catLabel} · Modell: ${e.kwh.toFixed(1)} kWh</option>`;
+  }).join('');
 }
 
 function submitCalibration() {
@@ -2844,17 +2967,17 @@ function submitCalibration() {
   const actual = +inp.value;
   if (!actual || actual <= 0 || !sel.value) return;
 
-  // Option value format: "fIdx|ds|kwh"
   const parts     = sel.value.split('|');
   const ds        = parts[1];
   const predicted = +parts[2];
+  const cloud     = +parts[3] || 0; // cloud% stored in option value
 
   if (!ds || predicted < 0.1) { alert('Ungültiger Eintrag.'); return; }
+  const cat = cloudCategory(cloud);
   const entries = loadCalEntries();
-  // Replace if same date already exists
   const existing = entries.findIndex(e => e.date === ds);
   if (existing >= 0) entries.splice(existing, 1);
-  entries.push({ date: ds, predicted, actual, ratio: actual / predicted });
+  entries.push({ date: ds, predicted, actual, ratio: actual / predicted, cat, cloud });
   saveCalEntries(entries);
   inp.value = '';
   updateCalDisplay();
@@ -2940,7 +3063,9 @@ function loadSettings() {
     if (chk) toggleArr2();
 
     // Store block data for use in buildBlocks
-    if (data._blocks) window._savedBlocks = data._blocks;
+    if (data._blocks) {
+    window._savedBlocks = data._blocks;
+  }
     return true;
   } catch(e) { return false; }
 }
@@ -2951,14 +3076,8 @@ buildBlocks = function() {
   _origBuildBlocks();
   if (window._savedBlocks) {
     BLOCKS.forEach(function(b) {
-      const sv = window._savedBlocks['shade_' + b.id];
-      const lv = window._savedBlocks['load_'  + b.id];
-      if (sv != null) {
-        const sr = document.getElementById('shadeR_' + b.id);
-        const sn = document.getElementById('shadeN_' + b.id);
-        if (sr) sr.value = sv;
-        if (sn) sn.value = sv;
-      }
+      if (b.id === 'night') return;
+      const lv = window._savedBlocks['load_' + b.id];
       if (lv != null) {
         const lr = document.getElementById('loadR_' + b.id);
         const ln = document.getElementById('loadN_' + b.id);
@@ -2977,6 +3096,7 @@ document.getElementById('vSetup').addEventListener('change', saveSettings);
 // Restore on load
 loadSettings();
 buildBlocks();
+buildHourlyShadeGrid();
 // Restore degradation % display after settings load
 (function() {
   const y = +document.getElementById('iDegYears').value || 0;
