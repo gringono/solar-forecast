@@ -772,7 +772,7 @@
     Strahlungsdaten: Open-Meteo (DNI, DHI, GHI, T₂ₘ · stündlich) · Modell: DWD ICON-D2/EU<br>
     POA nach Duffie &amp; Beckman · NOCT-Temperaturkorrektur · DC-gekoppelte Batteriesimulation<br>
     Keine Registrierung · Keine API-Keys · Open Source · Wetterdaten: Open-Meteo (CC BY 4.0)<br>
-    <span style="color:var(--accent);font-weight:600;">v1.5.0</span>
+    <span style="color:var(--accent);font-weight:600;">v1.6.0</span>
   </p>
 </div>
 
@@ -2439,39 +2439,60 @@ async function loadYearView() {
       mCnt[m]++;
     });
 
-    // Monthly kWh
-    const tiltFactor = 1 + 0.35 * Math.cos((gTilt - 35) * DEG);
+    // Monthly kWh — physically correct factors
+    // Array 1
+    const beta = gTilt;
+    const tiltFactor = Math.max(0.5, 1 + 0.0065 * beta - 0.000058 * beta * beta);
+    const azDev = Math.abs(selAz - 180);
+    const azFactor = Math.max(0.6, 1 - Math.pow(azDev / 180, 1.8) * 0.55);
+
+    // Array 2 (if active)
+    const arr2on    = document.getElementById('chkArr2')?.checked;
+    const gKwp2y    = arr2on ? (+document.getElementById('iKwp2').value   || 0) : 0;
+    const gTilt2y   = arr2on ? (+document.getElementById('iTilt2').value  || 0) : 0;
+    const gAz2y     = arr2on ? (+document.getElementById('iAzDeg2').value || 180) : 180;
+    const beta2     = gTilt2y;
+    const tiltFactor2 = gKwp2y > 0 ? Math.max(0.5, 1 + 0.0065 * beta2 - 0.000058 * beta2 * beta2) : 0;
+    const azDev2    = Math.abs(gAz2y - 180);
+    const azFactor2 = gKwp2y > 0 ? Math.max(0.6, 1 - Math.pow(azDev2 / 180, 1.8) * 0.55) : 0;
+
+    // System PR correction: wiring ~2%, inverter real curve ~2%, soiling ~2%, mismatch ~1%
+    const sysPR = 0.93;
+
+    // Hourly shading: use weighted average from hourly shade grid (8–20 Uhr)
+    const hourlyShadeAvg = SHADE_HOURS.reduce((s, h) => s + getHourlyShade(h), 0) / SHADE_HOURS.length;
+    const shadeFact = Math.max(0, 1 - hourlyShadeAvg / 100);
+
     const loadSum = BLOCKS.reduce((s, b) => s + getBlockVal(b.id, 'load'), 0);
     const price = +document.getElementById('iPrice').value;
 
     const monthlyKwh = [];
     for (let m = 0; m < 12; m++) {
       if (mCnt[m] === 0) { monthlyKwh.push(0); continue; }
-      // radArr[m] is MJ/m²/month total → /3.6 = kWh/m²/month
       const radMonthKwh = mRad[m] / 3.6;
       const tAvg = mTemp[m] / mCnt[m];
       const radDay = radMonthKwh / mCnt[m];
       const tCell = tAvg + radDay * 0.8 * (45 - 20) / 800;
       const tempFact = Math.max(0.7, 1 - (gTc / 100) * Math.max(0, tCell - 25));
 
-      // Shade factor: weighted by daytime blocks
-      const shadeFact = 1 - (
-        (getBlockVal('morning','shade') * 4 +
-         getBlockVal('midday','shade') * 4 +
-         getBlockVal('aftnoon','shade') * 4 +
-         getBlockVal('evening','shade') * 2) / 14
-      ) / 100;
-
-      // Use real clipping factor from 7-day simulation if available,
-      // otherwise fall back to a conservative statistical estimate
-      const dcPeak   = gKwp * gEff / 100; // kW peak DC
+      // WR clipping
+      const dcPeak    = (gKwp + gKwp2y) * gEff / 100;
       const dcAcRatio = dcPeak / Math.max(0.01, gWrMax);
-      // Statistical clipping loss for annual estimate when 7-day data not yet loaded:
-      // ~8% loss per 0.1 above DC:AC = 1.0 (empirical, conservative)
-      const fallbackClip = dcAcRatio > 1 ? Math.max(0.6, 1 - (dcAcRatio - 1) * 0.12) : 1.0;
+      const fallbackClip = dcAcRatio > 1
+        ? Math.max(0.55, 1 - (dcAcRatio - 1) * 0.22)
+        : 1.0;
       const wrFactor = gClipFactor < 1.0 ? gClipFactor : fallbackClip;
-      const kwh = radMonthKwh * tiltFactor * gKwp * (gEff / 100) * tempFact * shadeFact * wrFactor;
-      monthlyKwh.push(+kwh.toFixed(1));
+
+      // Array 1 contribution
+      const kwh1 = radMonthKwh * tiltFactor * azFactor * gKwp * (gEff / 100)
+                   * tempFact * shadeFact * wrFactor * sysPR;
+      // Array 2 contribution (same temperature/shading assumption)
+      const kwh2 = gKwp2y > 0
+        ? radMonthKwh * tiltFactor2 * azFactor2 * gKwp2y * (gEff / 100)
+          * tempFact * shadeFact * wrFactor * sysPR
+        : 0;
+
+      monthlyKwh.push(+(kwh1 + kwh2).toFixed(1));
     }
 
     const yearTotal = monthlyKwh.reduce((s, v) => s + v, 0);
