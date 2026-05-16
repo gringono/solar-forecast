@@ -772,7 +772,7 @@
     Strahlungsdaten: Open-Meteo (DNI, DHI, GHI, T₂ₘ · stündlich) · Modell: DWD ICON-D2/EU<br>
     POA nach Duffie &amp; Beckman · NOCT-Temperaturkorrektur · DC-gekoppelte Batteriesimulation<br>
     Keine Registrierung · Keine API-Keys · Open Source · Wetterdaten: Open-Meteo (CC BY 4.0)<br>
-    <span style="color:var(--accent);font-weight:600;">v1.6.0</span>
+    <span style="color:var(--accent);font-weight:600;">v1.7.0</span>
   </p>
 </div>
 
@@ -1575,14 +1575,15 @@ async function doCalc() {
       gClipFactor = totalDC > 0 ? totalAC / totalDC : 1.0;
     }
 
-    // ── Store today's prediction for tomorrow's calibration ──────
+    // ── Store today's RAW prediction BEFORE calibration ──────────
+    // Must be stored before applying calibration factor so the comparison
+    // in Kalibrierung reflects what the model actually predicted, not the corrected value.
     if (fData[0]) {
       try {
         const stored = JSON.parse(localStorage.getItem('solarTodayPred_v2') || '[]');
-        // Only store if not already saved for this date
+        // First calculation of the day wins — never overwrite
         if (!stored.find(e => e.ds === fData[0].ds)) {
           stored.push({ ds: fData[0].ds, kwh: fData[0].kwh, cloud: fData[0].cloud || 0 });
-          // Keep last 14 days
           localStorage.setItem('solarTodayPred_v2', JSON.stringify(stored.slice(-14)));
         }
       } catch(e) {}
@@ -2893,56 +2894,10 @@ function resetCalibration() {
 }
 
 async function fetchYesterdayPrediction() {
-  if (!gLat || !gKwp) return;
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const ds = yesterday.toISOString().slice(0, 10);
-
-  try {
-    const stored = JSON.parse(localStorage.getItem('solarTodayPred_v2') || '[]');
-    if (stored.find(e => e.ds === ds)) return;
-  } catch(e) {}
-
-  try {
-    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${gLat}&longitude=${gLon}` +
-      `&start_date=${ds}&end_date=${ds}` +
-      `&hourly=shortwave_radiation,direct_normal_irradiance,diffuse_radiation,temperature_2m,cloudcover` +
-      `&timezone=auto`;
-    const res = await fetch(url);
-    if (!res.ok) return;
-    const j   = await res.json();
-    const { shortwave_radiation: GHI, direct_normal_irradiance: DNI,
-            diffuse_radiation: DHI, temperature_2m: TEMP, cloudcover: CC_arch } = j.hourly;
-
-    const tilt  = gTilt, eff = gEff, wrMax = gWrMax, tc = gTc;
-    const NOCT  = 45;
-    const degYears  = +document.getElementById('iDegYears').value || 0;
-    const degFactor = Math.max(0.75, 1 - degYears * 0.005);
-    const beta      = tilt * DEG;
-    let totalKwh    = 0;
-
-    for (let i = 0; i < GHI.length; i++) {
-      const hour = i % 24;
-      const ci   = cosAOI(gLat, gLon, tilt, selAz, ds, hour);
-      const poa  = Math.max(0,
-        (DNI[i]||0) * ci +
-        (DHI[i]||0) * (1 + Math.cos(beta)) / 2 +
-        (GHI[i]||0) * 0.2 * (1 - Math.cos(beta)) / 2
-      );
-      const p_dc_raw = poa * gKwp * eff / 100 / 1000 * degFactor;
-      const t_air    = TEMP[i] ?? 20;
-      const t_cell   = t_air + poa * (NOCT - 20) / 800;
-      const tFact    = 1 - (tc / 100) * Math.max(0, t_cell - 25);
-      totalKwh      += Math.min(p_dc_raw * tFact, wrMax);
-    }
-
-    const kwh    = +totalKwh.toFixed(2);
-    const cloudAvg = CC_arch ? Math.round(CC_arch.reduce((s,v)=>s+(v||0),0)/CC_arch.length) : 0;
-    const stored = JSON.parse(localStorage.getItem('solarTodayPred_v2') || '[]');
-    stored.push({ ds, kwh, cloud: cloudAvg });
-    localStorage.setItem('solarTodayPred_v2', JSON.stringify(stored.slice(-14)));
-    buildCalDaySelect();
-  } catch(e) {}
+  // Disabled: Archive-API würde nachträglich neu berechnete Werte liefern
+  // statt der originalen Vorhersage — das würde die Kalibrierung verfälschen.
+  // Der beim ersten Berechnen gespeicherte Forecast-Wert bleibt erhalten.
+  return;
 }
 
 function buildCalDaySelect() {
