@@ -770,9 +770,10 @@
 
   <p class="info-footer">
     Strahlungsdaten: Open-Meteo (DNI, DHI, GHI, T₂ₘ · stündlich) · Modell: DWD ICON-D2/EU<br>
+    Jahresansicht: EUMETSAT CM SAF SARAH3 (Satellitenmessung seit 1983) via Open-Meteo<br>
     POA nach Duffie &amp; Beckman · NOCT-Temperaturkorrektur · DC-gekoppelte Batteriesimulation<br>
     Keine Registrierung · Keine API-Keys · Open Source · Wetterdaten: Open-Meteo (CC BY 4.0)<br>
-    <span style="color:var(--accent);font-weight:600;">v1.7.1</span>
+    <span style="color:var(--accent);font-weight:600;">v1.8.0</span>
   </p>
 </div>
 
@@ -2406,37 +2407,64 @@ async function loadYearView() {
   if (btn.dataset.loaded === '1') return;
   btn.textContent = '⏳ Lade…';
 
+  const year = new Date().getFullYear() - 1;
+  // EUMETSAT CM SAF SARAH3 via satellite-api — measured satellite data since 1983
+  // More accurate than ERA5 for solar radiation, different server than archive-api
+  const url = `https://satellite-api.open-meteo.com/v1/archive` +
+    `?latitude=${gLat}&longitude=${gLon}` +
+    `&start_date=${year}-01-01&end_date=${year}-12-31` +
+    `&daily=shortwave_radiation_sum` +
+    `&models=eumetsat_sarah3` +
+    `&timezone=auto`;
+
+  // NRW monthly average temperatures (°C) — used for NOCT correction
+  // Source: DWD Klimanormalperiode 1991–2020, Station Düsseldorf
+  const NRW_TEMP = [3.1, 3.9, 7.4, 11.7, 16.3, 19.3, 21.2, 21.0, 17.0, 12.0, 7.0, 3.5];
+
+  // Retry up to 3 times with increasing delay
+  let j = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      if (attempt > 1) {
+        btn.textContent = `⏳ Versuch ${attempt}/3…`;
+        await new Promise(r => setTimeout(r, attempt * 1500));
+      }
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      j = await res.json();
+      break;
+    } catch(e) {
+      if (attempt === 3) {
+        const isNet = e.message === 'Load failed' || e.message === 'Failed to fetch';
+        document.getElementById('yTotal').innerHTML = isNet
+          ? `<span style="font-size:12px;color:#f87171;">Keine Verbindung zur Wetter-API.<br>Bitte erneut versuchen.</span>`
+          : `<span style="font-size:12px;color:#f87171;">Fehler: ${e.message}</span>`;
+        document.getElementById('ySavings').textContent    = '—';
+        document.getElementById('yBestMonth').textContent  = '—';
+        document.getElementById('yWorstMonth').textContent = '—';
+        btn.dataset.loaded = '';
+        btn.textContent = 'Jahresansicht';
+        return;
+      }
+    }
+  }
+
   try {
-    // Use Historical Weather API (ERA5 reanalysis) — last full year
-    const year = new Date().getFullYear() - 1;
-    const url = `https://archive-api.open-meteo.com/v1/archive` +
-      `?latitude=${gLat}&longitude=${gLon}` +
-      `&start_date=${year}-01-01&end_date=${year}-12-31` +
-      `&daily=shortwave_radiation_sum,temperature_2m_max` +
-      `&timezone=auto`;
 
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const j = await res.json();
-
-    const dates = j.daily?.time || [];
+    const dates  = j.daily?.time || [];
     const radArr = j.daily?.shortwave_radiation_sum || [];
-    const tempArr = j.daily?.temperature_2m_max || [];
 
     if (!dates.length) throw new Error('Keine Daten');
 
     const months = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
-    const daysInMonth = [31,28,31,30,31,30,31,31,30,31,30,31];
 
     // Group by month
-    const mRad  = Array(12).fill(0);
-    const mTemp = Array(12).fill(0);
-    const mCnt  = Array(12).fill(0);
+    const mRad = Array(12).fill(0);
+    const mCnt = Array(12).fill(0);
 
     dates.forEach((d, i) => {
       const m = +d.slice(5, 7) - 1;
-      if (radArr[i]  != null) { mRad[m]  += radArr[i];  }
-      if (tempArr[i] != null) { mTemp[m] += tempArr[i]; }
+      if (radArr[i] != null) mRad[m] += radArr[i];
       mCnt[m]++;
     });
 
@@ -2471,7 +2499,7 @@ async function loadYearView() {
     for (let m = 0; m < 12; m++) {
       if (mCnt[m] === 0) { monthlyKwh.push(0); continue; }
       const radMonthKwh = mRad[m] / 3.6;
-      const tAvg = mTemp[m] / mCnt[m];
+      const tAvg = NRW_TEMP[m];
       const radDay = radMonthKwh / mCnt[m];
       const tCell = tAvg + radDay * 0.8 * (45 - 20) / 800;
       const tempFact = Math.max(0.7, 1 - (gTc / 100) * Math.max(0, tCell - 25));
@@ -2530,7 +2558,7 @@ async function loadYearView() {
     document.getElementById('yearLegend').innerHTML =
       `<span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#f59e0b;"></span>Über Jahresdurchschnitt</span>` +
       `<span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#b45309;"></span>Unter Jahresdurchschnitt</span>` +
-      `<span style="font-size:10px;color:var(--muted);margin-left:4px;">Basis: ERA5 ${year}</span>`;
+      `<span style="font-size:10px;color:var(--muted);margin-left:4px;">Basis: SARAH3 ${year}</span>`;
 
     yearChart = new Chart(document.getElementById('yearChart').getContext('2d'), {
       type: 'bar',
