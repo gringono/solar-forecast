@@ -773,7 +773,7 @@
     Jahresansicht: EUMETSAT CM SAF SARAH3 (Satellitenmessung seit 1983) via Open-Meteo<br>
     POA nach Duffie &amp; Beckman · NOCT-Temperaturkorrektur · DC-gekoppelte Batteriesimulation<br>
     Keine Registrierung · Keine API-Keys · Open Source · Wetterdaten: Open-Meteo (CC BY 4.0)<br>
-    <span style="color:var(--accent);font-weight:600;">v1.8.0</span>
+    <span style="color:var(--accent);font-weight:600;">v1.8.1</span>
   </p>
 </div>
 
@@ -1707,8 +1707,17 @@ async function doCalc() {
 
     document.getElementById('vSetup').style.display = 'none';
     document.getElementById('vForecast').style.display = 'block';
-    document.getElementById('btnYear').dataset.loaded = '';
-    if (yearChart) { yearChart.destroy(); yearChart = null; }
+    // Don't reset year view — keep cached results stable
+    // Only reset if kWp/location/tilt changed (handled by config hash)
+    const cfgHash = [gLat, gLon, gKwp, gTilt, selAz].join('|');
+    const prevHash = localStorage.getItem('solarYearCfgHash');
+    if (cfgHash !== prevHash) {
+      // Config changed — invalidate year cache
+      document.getElementById('btnYear').dataset.loaded = '';
+      if (yearChart) { yearChart.destroy(); yearChart = null; }
+      localStorage.removeItem('solarYearCache_v1');
+      localStorage.setItem('solarYearCfgHash', cfgHash);
+    }
     showView('7d');
     calcBatReco();
     buildCalDaySelect();
@@ -2405,6 +2414,17 @@ function selectDay(idx) {
 async function loadYearView() {
   const btn = document.getElementById('btnYear');
   if (btn.dataset.loaded === '1') return;
+
+  // Try cache first
+  try {
+    const cached = JSON.parse(localStorage.getItem('solarYearCache_v1') || 'null');
+    if (cached && cached.monthlyKwh && cached.year) {
+      renderYearResults(cached.monthlyKwh, cached.year);
+      btn.dataset.loaded = '1';
+      return;
+    }
+  } catch(e) {}
+
   btn.textContent = '⏳ Lade…';
 
   const year = new Date().getFullYear() - 1;
@@ -2504,13 +2524,14 @@ async function loadYearView() {
       const tCell = tAvg + radDay * 0.8 * (45 - 20) / 800;
       const tempFact = Math.max(0.7, 1 - (gTc / 100) * Math.max(0, tCell - 25));
 
-      // WR clipping
+      // WR clipping — use annual statistical estimate, NOT gClipFactor from current week
+      // gClipFactor varies day-to-day and would make the year view unstable
+      // Annual average clipping is always more conservative than a sunny-week sample
       const dcPeak    = (gKwp + gKwp2y) * gEff / 100;
       const dcAcRatio = dcPeak / Math.max(0.01, gWrMax);
-      const fallbackClip = dcAcRatio > 1
+      const wrFactor  = dcAcRatio > 1
         ? Math.max(0.55, 1 - (dcAcRatio - 1) * 0.22)
         : 1.0;
-      const wrFactor = gClipFactor < 1.0 ? gClipFactor : fallbackClip;
 
       // Array 1 contribution
       const kwh1 = radMonthKwh * tiltFactor * azFactor * gKwp * (gEff / 100)
@@ -2524,92 +2545,100 @@ async function loadYearView() {
       monthlyKwh.push(+(kwh1 + kwh2).toFixed(1));
     }
 
-    const yearTotal = monthlyKwh.reduce((s, v) => s + v, 0);
-    gYearlyKwh = yearTotal; // store for amortisation recalculation
-    const bestIdx  = monthlyKwh.indexOf(Math.max(...monthlyKwh));
-    const worstIdx = monthlyKwh.indexOf(Math.min(...monthlyKwh));
+    // Cache results — stable until config changes
+    try {
+      localStorage.setItem('solarYearCache_v1', JSON.stringify({ monthlyKwh, year }));
+    } catch(e) {}
 
-    document.getElementById('yTotal').textContent = yearTotal.toFixed(0) + ' kWh';
-    document.getElementById('yBestMonth').textContent  = months[bestIdx]  + ' · ' + monthlyKwh[bestIdx].toFixed(0)  + ' kWh';
-    document.getElementById('yWorstMonth').textContent = months[worstIdx] + ' · ' + monthlyKwh[worstIdx].toFixed(0) + ' kWh';
-
-    if (gConsume > 0 && price > 0) {
-      const selfRatio  = Math.min(0.9, gConsume * 365 / (yearTotal * 1.2 + 1));
-      const yearSelf   = yearTotal * selfRatio;
-      const yearSaved  = +(yearSelf * price).toFixed(0);
-      document.getElementById('ySavings').textContent = yearSaved + ' €';
-      // Amortisation with confidence band — ERA5-based
-      const invest = +document.getElementById('iInvest').value;
-      calcAmort(yearSelf, price, invest);
-    } else {
-      document.getElementById('ySavings').textContent = price > 0 ? '—' : 'Strompreis eingeben';
-      const yAmort = document.getElementById('yAmortBox');
-      if (yAmort) yAmort.style.display = 'none';
-    }
-
-    // Chart
-    const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
-    const gc  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-    const tc2 = isDark ? 'rgba(255,255,255,0.40)' : 'rgba(0,0,0,0.40)';
-    const avg = yearTotal / 12;
-
-    if (yearChart) { yearChart.destroy(); yearChart = null; }
-
-    document.getElementById('yearLegend').innerHTML =
-      `<span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#f59e0b;"></span>Über Jahresdurchschnitt</span>` +
-      `<span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#b45309;"></span>Unter Jahresdurchschnitt</span>` +
-      `<span style="font-size:10px;color:var(--muted);margin-left:4px;">Basis: SARAH3 ${year}</span>`;
-
-    yearChart = new Chart(document.getElementById('yearChart').getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels: months,
-        datasets: [{
-          label: 'kWh',
-          data: monthlyKwh,
-          backgroundColor: monthlyKwh.map(v => v >= avg ? '#f59e0b' : '#b45309'),
-          borderRadius: 4,
-          borderSkipped: false
-        }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: '#111827', borderColor: '#1e2d45', borderWidth: 1,
-            callbacks: {
-              label: ctx => '  ' + ctx.raw.toFixed(0) + ' kWh',
-              afterBody: ts => {
-                const m = ts[0].dataIndex;
-                const daily = daysInMonth[m] > 0 ? (monthlyKwh[m] / daysInMonth[m]).toFixed(1) : '—';
-                return [`  Ø ${daily} kWh/Tag`, `  ${((monthlyKwh[m]/yearTotal)*100).toFixed(1)}% des Jahresertrags`];
-              }
-            }
-          }
-        },
-        scales: {
-          x: { ticks: { color: tc2, font: { size: 11 } }, grid: { color: gc } },
-          y: { beginAtZero: true, ticks: { color: tc2, font: { size: 10 }, callback: v => v + ' kWh' }, grid: { color: gc } }
-        }
-      }
-    });
-
-    document.getElementById('yearChart').parentElement.style.height = '240px';
+    renderYearResults(monthlyKwh, year);
     btn.dataset.loaded = '1';
 
   } catch (e) {
     const isNetworkError = e.message === 'Load failed' || e.message === 'Failed to fetch' || e.message === 'NetworkError';
     document.getElementById('yTotal').innerHTML = isNetworkError
-      ? `<span style="font-size:12px;color:#f87171;">Keine Verbindung zur Wetter-API.<br>Bitte Internetverbindung prüfen und erneut versuchen.</span>`
+      ? `<span style="font-size:12px;color:#f87171;">Keine Verbindung zur Wetter-API.<br>Bitte erneut versuchen.</span>`
       : `<span style="font-size:12px;color:#f87171;">Fehler: ${e.message}</span>`;
     document.getElementById('ySavings').textContent    = '—';
     document.getElementById('yBestMonth').textContent  = '—';
     document.getElementById('yWorstMonth').textContent = '—';
-    btn.dataset.loaded = ''; // allow retry
+    btn.dataset.loaded = '';
     console.error('Year view error:', e);
   }
   btn.textContent = 'Jahresansicht';
+}
+
+function renderYearResults(monthlyKwh, year) {
+  const months      = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  const daysInMonth = [31,28,31,30,31,30,31,31,30,31,30,31];
+  const price   = +document.getElementById('iPrice').value;
+  const yearTotal = monthlyKwh.reduce((s, v) => s + v, 0);
+  gYearlyKwh = yearTotal;
+
+  const bestIdx  = monthlyKwh.indexOf(Math.max(...monthlyKwh));
+  const worstIdx = monthlyKwh.indexOf(Math.min(...monthlyKwh));
+
+  document.getElementById('yTotal').textContent      = yearTotal.toFixed(0) + ' kWh';
+  document.getElementById('yBestMonth').textContent  = months[bestIdx]  + ' · ' + monthlyKwh[bestIdx].toFixed(0)  + ' kWh';
+  document.getElementById('yWorstMonth').textContent = months[worstIdx] + ' · ' + monthlyKwh[worstIdx].toFixed(0) + ' kWh';
+
+  if (gConsume > 0 && price > 0) {
+    const selfRatio = Math.min(0.9, gConsume * 365 / (yearTotal * 1.2 + 1));
+    const yearSelf  = yearTotal * selfRatio;
+    const yearSaved = +(yearSelf * price).toFixed(0);
+    document.getElementById('ySavings').textContent = yearSaved + ' €';
+    const invest = +document.getElementById('iInvest').value;
+    calcAmort(yearSelf, price, invest);
+  } else {
+    document.getElementById('ySavings').textContent = price > 0 ? '—' : 'Strompreis eingeben';
+    const yAmort = document.getElementById('yAmortBox');
+    if (yAmort) yAmort.style.display = 'none';
+  }
+
+  const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const gc  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const tc2 = isDark ? 'rgba(255,255,255,0.40)' : 'rgba(0,0,0,0.40)';
+  const avg = yearTotal / 12;
+
+  if (yearChart) { yearChart.destroy(); yearChart = null; }
+
+  document.getElementById('yearLegend').innerHTML =
+    `<span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#f59e0b;"></span>Über Jahresdurchschnitt</span>` +
+    `<span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#b45309;"></span>Unter Jahresdurchschnitt</span>` +
+    `<span style="font-size:10px;color:var(--muted);margin-left:4px;">Basis: SARAH3 ${year}</span>`;
+
+  yearChart = new Chart(document.getElementById('yearChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [{
+        label: 'kWh', data: monthlyKwh,
+        backgroundColor: monthlyKwh.map(v => v >= avg ? '#f59e0b' : '#b45309'),
+        borderRadius: 4, borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#111827', borderColor: '#1e2d45', borderWidth: 1,
+          callbacks: {
+            label: ctx => '  ' + ctx.raw.toFixed(0) + ' kWh',
+            afterBody: ts => {
+              const m = ts[0].dataIndex;
+              const daily = daysInMonth[m] > 0 ? (monthlyKwh[m] / daysInMonth[m]).toFixed(1) : '—';
+              return [`  Ø ${daily} kWh/Tag`, `  ${((monthlyKwh[m]/yearTotal)*100).toFixed(1)}% des Jahresertrags`];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: tc2, font: { size: 11 } }, grid: { color: gc } },
+        y: { beginAtZero: true, ticks: { color: tc2, font: { size: 10 }, callback: v => v + ' kWh' }, grid: { color: gc } }
+      }
+    }
+  });
+  document.getElementById('yearChart').parentElement.style.height = '240px';
 }
 
 function showSetup() {
@@ -3101,8 +3130,23 @@ buildBlocks = function() {
 };
 
 // Auto-save on any input/change in the setup view
-document.getElementById('vSetup').addEventListener('input',  saveSettings);
-document.getElementById('vSetup').addEventListener('change', saveSettings);
+document.getElementById('vSetup').addEventListener('input',  function() {
+  saveSettings();
+  // Invalidate year cache — any input change may affect annual yield
+  localStorage.removeItem('solarYearCache_v1');
+  localStorage.removeItem('solarYearCfgHash');
+  if (typeof yearChart !== 'undefined' && yearChart) { yearChart.destroy(); yearChart = null; }
+  const btn = document.getElementById('btnYear');
+  if (btn) btn.dataset.loaded = '';
+});
+document.getElementById('vSetup').addEventListener('change', function() {
+  saveSettings();
+  localStorage.removeItem('solarYearCache_v1');
+  localStorage.removeItem('solarYearCfgHash');
+  if (typeof yearChart !== 'undefined' && yearChart) { yearChart.destroy(); yearChart = null; }
+  const btn = document.getElementById('btnYear');
+  if (btn) btn.dataset.loaded = '';
+});
 
 // Restore on load
 loadSettings();
