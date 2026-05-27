@@ -773,7 +773,7 @@
     Jahresansicht: EUMETSAT CM SAF SARAH3 (Satellitenmessung seit 1983) via Open-Meteo<br>
     POA nach Duffie &amp; Beckman · NOCT-Temperaturkorrektur · DC-gekoppelte Batteriesimulation<br>
     Keine Registrierung · Keine API-Keys · Open Source · Wetterdaten: Open-Meteo (CC BY 4.0)<br>
-    <span style="color:var(--accent);font-weight:600;">v1.8.1</span>
+    <span style="color:var(--accent);font-weight:600;">v1.8.2</span>
   </p>
 </div>
 
@@ -2871,7 +2871,12 @@ function getCalFactor() {
 function getCalFactorByCat() {
   const entries = loadCalEntries();
   const cats = { sunny: [], cloudy: [], overcast: [] };
-  entries.forEach(e => { if (cats[e.cat]) cats[e.cat].push(e.ratio); });
+  entries.forEach(e => {
+    // Only include entries with valid cloud data (not 'unknown', not old entries without cat)
+    if (e.cat && e.cat !== 'unknown' && cats[e.cat]) {
+      cats[e.cat].push(e.ratio);
+    }
+  });
   const result = {};
   Object.keys(cats).forEach(c => {
     result[c] = cats[c].length >= 2
@@ -2879,6 +2884,19 @@ function getCalFactorByCat() {
       : null;
   });
   return result;
+}
+
+function getCalFactorForCloud(cloud) {
+  const entries = loadCalEntries();
+  if (entries.length < 2) return 1;
+  const cat = cloudCategory(cloud);
+  // Only use entries with valid cloud data for category-specific factor
+  const catEntries = entries.filter(e => e.cat === cat && e.cat !== 'unknown');
+  if (catEntries.length >= 2) {
+    const avg = catEntries.reduce((s, e) => s + e.ratio, 0) / catEntries.length;
+    return Math.max(0.5, Math.min(2.0, avg));
+  }
+  return getCalFactor();
 }
 
 function fmtDateShort(ds) {
@@ -2995,9 +3013,9 @@ function buildCalDaySelect() {
   }
   btn.disabled = false;
   sel.innerHTML = allPast.map(e => {
-    const cloud = e.cloud != null ? e.cloud : 0;
-    const catLabel = CAT_LABELS[cloudCategory(cloud)] || '';
-    return `<option value="${e.fIdx}|${e.ds}|${e.kwh}|${cloud}">${fmtDate(e.ds)} · ${catLabel} · Modell: ${e.kwh.toFixed(1)} kWh</option>`;
+    const cloud = (e.cloud != null && e.cloud >= 0) ? e.cloud : null;
+    const catLabel = cloud != null ? (CAT_LABELS[cloudCategory(cloud)] || '') : '❓';
+    return `<option value="${e.fIdx}|${e.ds}|${e.kwh}|${cloud ?? ''}">${fmtDate(e.ds)} · ${catLabel} · Modell: ${e.kwh.toFixed(1)} kWh</option>`;
   }).join('');
 }
 
@@ -3010,14 +3028,21 @@ function submitCalibration() {
   const parts     = sel.value.split('|');
   const ds        = parts[1];
   const predicted = +parts[2];
-  const cloud     = +parts[3] || 0; // cloud% stored in option value
+  // cloud is stored as parts[3] — only valid if explicitly set (not 0/missing)
+  const cloudRaw  = parts[3];
+  const cloud     = (cloudRaw != null && cloudRaw !== '' && cloudRaw !== 'null')
+    ? +cloudRaw : null;
 
   if (!ds || predicted < 0.1) { alert('Ungültiger Eintrag.'); return; }
-  const cat = cloudCategory(cloud);
+
+  // Only assign category if valid cloud data exists
+  const cat = (cloud != null) ? cloudCategory(cloud) : null;
+
   const entries = loadCalEntries();
   const existing = entries.findIndex(e => e.date === ds);
   if (existing >= 0) entries.splice(existing, 1);
-  entries.push({ date: ds, predicted, actual, ratio: actual / predicted, cat, cloud });
+  entries.push({ date: ds, predicted, actual, ratio: actual / predicted,
+                 cat: cat || 'unknown', cloud: cloud ?? -1 });
   saveCalEntries(entries);
   inp.value = '';
   updateCalDisplay();
