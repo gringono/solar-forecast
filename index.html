@@ -773,7 +773,7 @@
     Jahresansicht: EUMETSAT CM SAF SARAH3 (Satellitenmessung seit 1983) via Open-Meteo<br>
     POA nach Duffie &amp; Beckman · NOCT-Temperaturkorrektur · DC-gekoppelte Batteriesimulation<br>
     Keine Registrierung · Keine API-Keys · Open Source · Wetterdaten: Open-Meteo (CC BY 4.0)<br>
-    <span style="color:var(--accent);font-weight:600;">v1.8.2</span>
+    <span style="color:var(--accent);font-weight:600;">v1.8.3</span>
   </p>
 </div>
 
@@ -1576,16 +1576,27 @@ async function doCalc() {
       gClipFactor = totalDC > 0 ? totalAC / totalDC : 1.0;
     }
 
-    // ── Store today's RAW prediction BEFORE calibration ──────────
-    // Must be stored before applying calibration factor so the comparison
-    // in Kalibrierung reflects what the model actually predicted, not the corrected value.
-    if (fData[0]) {
+    // ── Store RAW predictions BEFORE calibration ──────────────────
+    // Store every forecast day's value the first time we see it.
+    // First forecast for a date wins — never overwrite. This preserves
+    // what the model originally predicted, even if recalculated later.
+    if (fData.length) {
       try {
+        const todayStr = new Date().toISOString().slice(0, 10);
         const stored = JSON.parse(localStorage.getItem('solarTodayPred_v2') || '[]');
-        // First calculation of the day wins — never overwrite
-        if (!stored.find(e => e.ds === fData[0].ds)) {
-          stored.push({ ds: fData[0].ds, kwh: fData[0].kwh, cloud: fData[0].cloud || 0 });
-          localStorage.setItem('solarTodayPred_v2', JSON.stringify(stored.slice(-14)));
+        let changed = false;
+        fData.forEach(function(d) {
+          // Only store today and (rarely) past days — future forecasts are less
+          // accurate than the day-of forecast, so we don't pre-store them
+          if (d.ds > todayStr) return;
+          if (!stored.find(e => e.ds === d.ds)) {
+            stored.push({ ds: d.ds, kwh: d.kwh, cloud: d.cloud || 0 });
+            changed = true;
+          }
+        });
+        if (changed) {
+          stored.sort((a,b) => a.ds.localeCompare(b.ds));
+          localStorage.setItem('solarTodayPred_v2', JSON.stringify(stored.slice(-21)));
         }
       } catch(e) {}
     }
@@ -2970,9 +2981,11 @@ function toggleCalDetails() {
 }
 
 function resetCalibration() {
-  if (!confirm('Alle Kalibriereinträge löschen?')) return;
+  if (!confirm('Alle Kalibriereinträge und gespeicherten Vorhersagen löschen?')) return;
   localStorage.removeItem(CAL_KEY);
+  localStorage.removeItem('solarTodayPred_v2');
   updateCalDisplay();
+  buildCalDaySelect();
 }
 
 async function fetchYesterdayPrediction() {
@@ -2989,21 +3002,25 @@ function buildCalDaySelect() {
 
   const todayStr = new Date().toISOString().slice(0, 10);
 
-  // Past days from current 7-day forecast
-  const forecastPast = (fData || []).filter(d => d.ds < todayStr);
-
-  // Stored predictions from previous calc runs (yesterday, day before etc.)
+  // Stored predictions = ORIGINAL forecasts saved on the day they were current.
+  // These take priority — they reflect what the model predicted at the time.
   let storedPast = [];
   try {
     storedPast = JSON.parse(localStorage.getItem('solarTodayPred_v2') || '[]')
-      .filter(e => e.ds < todayStr)
-      .filter(e => !forecastPast.find(d => d.ds === e.ds)); // no duplicates
+      .filter(e => e.ds < todayStr);
   } catch(e) {}
+  const storedDates = new Set(storedPast.map(e => e.ds));
+
+  // Forecast past days — only use if NOT already in stored predictions
+  // (recalculating a past day gives different values than the original forecast)
+  const forecastPast = (fData || [])
+    .filter(d => d.ds < todayStr)
+    .filter(d => !storedDates.has(d.ds)); // stored original wins
 
   // Merge and sort descending (newest first)
   const allPast = [
-    ...forecastPast.map(d => ({ ds: d.ds, kwh: d.kwh, cloud: d.cloud || 0, fIdx: fData.indexOf(d) })),
-    ...storedPast.map(e => ({ ds: e.ds, kwh: e.kwh, cloud: e.cloud || 0, fIdx: -1 }))
+    ...storedPast.map(e => ({ ds: e.ds, kwh: e.kwh, cloud: e.cloud != null ? e.cloud : 0, fIdx: -1 })),
+    ...forecastPast.map(d => ({ ds: d.ds, kwh: d.kwh, cloud: d.cloud || 0, fIdx: fData.indexOf(d) }))
   ].sort((a, b) => b.ds.localeCompare(a.ds));
 
   if (allPast.length === 0) {
