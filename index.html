@@ -773,7 +773,7 @@
     Jahresansicht: EUMETSAT CM SAF SARAH3 (Satellitenmessung seit 1983) via Open-Meteo<br>
     POA nach Duffie &amp; Beckman · NOCT-Temperaturkorrektur · DC-gekoppelte Batteriesimulation<br>
     Keine Registrierung · Keine API-Keys · Open Source · Wetterdaten: Open-Meteo (CC BY 4.0)<br>
-    <span style="color:var(--accent);font-weight:600;">v1.8.3</span>
+    <span style="color:var(--accent);font-weight:600;">v1.8.5</span>
   </p>
 </div>
 
@@ -1330,23 +1330,29 @@ async function doCalc() {
   }
   const lat          = +document.getElementById('iLat').value;
   const lon          = +document.getElementById('iLon').value;
-  const kwp          = +document.getElementById('iKwp').value;
-  const tilt         = +document.getElementById('iTilt').value;
-  const eff          = +document.getElementById('iEff').value;
-  const wrMax        = +document.getElementById('iWr').value;
-  const tc           = +document.getElementById('iTc').value;
-  const degYears     = +document.getElementById('iDegYears').value || 0;
+  // Read from number fields (exact value) — sliders may snap to their step
+  const numVal = (numId, sliderId) => {
+    const n = document.getElementById(numId);
+    if (n && n.value !== '' && !isNaN(+n.value)) return +n.value;
+    return +document.getElementById(sliderId).value;
+  };
+  const kwp          = numVal('nKwp', 'iKwp');
+  const tilt         = numVal('nTilt', 'iTilt');
+  const eff          = numVal('nEff', 'iEff');
+  const wrMax        = numVal('nWr', 'iWr');
+  const tc           = numVal('nTc', 'iTc');
+  const degYears     = numVal('nDegYears', 'iDegYears') || 0;
   const degFactor    = Math.max(0.75, 1 - degYears * 0.005); // –0.5%/year, floor at –25%
-  const consume      = +document.getElementById('iConsume').value;
-  const batCap       = +document.getElementById('iBat').value;
+  const consume      = numVal('nConsume', 'iConsume');
+  const batCap       = numVal('nBat', 'iBat');
   const batChargeW   = +document.getElementById('iBatChargeW').value;
   const batDischargeW= +document.getElementById('iBatDischargeW').value;
   const batEff       = +document.getElementById('iBatEff').value / 100;   // roundtrip e.g. 0.90
   const batMinSoc    = +document.getElementById('iBatMinSoc').value / 100;
   const loc          = document.getElementById('iLocName').value || `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
   // Second array
-  const kwp2    = arr2Active ? +document.getElementById('iKwp2').value  : 0;
-  const tilt2   = arr2Active ? +document.getElementById('iTilt2').value : 30;
+  const kwp2    = arr2Active ? numVal('nKwp2', 'iKwp2')   : 0;
+  const tilt2   = arr2Active ? numVal('nTilt2', 'iTilt2') : 30;
   const kwpTotal = kwp + kwp2;
 
   const NOCT       = 45;
@@ -1452,78 +1458,77 @@ async function doCalc() {
 
       let selfDirect = 0, batCharge = 0, batDischarge = 0, feedIn = 0, gridDraw = 0;
       let batLossHour = 0;
+      let pvProduced = 0;
 
       if (consume > 0) {
         // ── DC-coupled energy balance ──────────────────────────────
-        // Step 1: AC meets load directly
-        selfDirect = Math.min(ac_out, hourCons);
-        const ac_surplus = Math.max(0, ac_out - hourCons);
-        const ac_deficit = Math.max(0, hourCons - ac_out);
+        // Step 1: AC from inverter meets load directly
+        const pvDirect = Math.min(ac_out, hourCons);   // PV → load directly
+        selfDirect = pvDirect;
+        const ac_surplus = Math.max(0, ac_out - hourCons); // AC left after load
+        const ac_deficit = Math.max(0, hourCons - ac_out); // load not covered by AC
 
-        // Step 2: Charge battery — DC bypass has priority, then AC surplus
-        // Both are limited together by batChargeW
+        // Step 2: Charge battery — dc_bypass (over wrMax) + ac_surplus, limited by chargeW
         let chargeLeft = batChargeW;
+        let chargedFromDC = 0, chargedFromAC = 0;
         if (batCap > 0 && batSoC < batUsable) {
-          // 2a: DC bypass directly into battery (no inverter involved)
           if (dc_bypass > 0) {
-            const space   = batUsable - batSoC;
-            const ch      = Math.min(dc_bypass, chargeLeft, space / sqrtEff);
-            const stored  = ch * sqrtEff;
-            batSoC       += stored;
-            batCharge    += ch;
-            batLossHour  += ch - stored;
-            totalBatCharged += stored;
-            chargeLeft   -= ch;
+            const space = batUsable - batSoC;
+            const ch    = Math.min(dc_bypass, chargeLeft, space / sqrtEff);
+            batSoC += ch * sqrtEff; chargedFromDC = ch;
+            batLossHour += ch - ch * sqrtEff; totalBatCharged += ch * sqrtEff;
+            chargeLeft -= ch;
           }
-          // 2b: AC surplus into battery (AC-coupled path)
           if (ac_surplus > 0 && chargeLeft > 0) {
-            const space   = batUsable - batSoC;
-            const ch      = Math.min(ac_surplus, chargeLeft, space / sqrtEff);
-            const stored  = ch * sqrtEff;
-            batSoC       += stored;
-            batCharge    += ch;
-            batLossHour  += ch - stored;
-            totalBatCharged += stored;
-            chargeLeft   -= ch;
+            const space = batUsable - batSoC;
+            const ch    = Math.min(ac_surplus, chargeLeft, space / sqrtEff);
+            batSoC += ch * sqrtEff; chargedFromAC = ch;
+            batLossHour += ch - ch * sqrtEff; totalBatCharged += ch * sqrtEff;
+            chargeLeft -= ch;
           }
         }
+        batCharge = chargedFromDC + chargedFromAC;
 
-        // Feed-in: AC surplus not absorbed by battery
-        feedIn = Math.max(0, ac_surplus - (batCharge - Math.min(batCharge, dc_bypass)));
+        // Step 3: Feed-in = AC surplus not used for battery charging
+        feedIn = Math.max(0, ac_surplus - chargedFromAC);
 
-        // Step 3: Cover AC deficit from battery, then grid
+        // Step 4: Cover deficit from battery, then grid
         if (ac_deficit > 0) {
           if (batCap > 0 && batSoC > 0) {
             const avail     = Math.min(batSoC, batDischargeW, ac_deficit / sqrtEff);
             const delivered = avail * sqrtEff;
-            batSoC         -= avail;
-            batDischarge    = delivered;
-            batLossHour    += avail - delivered;
-            totalBatDischarged += delivered;
-            selfDirect     += Math.min(delivered, ac_deficit);
-            gridDraw        = Math.max(0, ac_deficit - delivered);
+            batSoC -= avail; batDischarge = delivered;
+            batLossHour += avail - delivered; totalBatDischarged += delivered;
+            selfDirect += Math.min(delivered, ac_deficit);
+            gridDraw = Math.max(0, ac_deficit - delivered);
           } else {
             gridDraw = ac_deficit;
           }
         }
         totalBatLoss += batLossHour;
+
+        // PV production = direct-to-load + charged into battery + fed to grid
+        // (battery discharge is NOT new production, it's stored PV from earlier)
+        pvProduced = pvDirect + batCharge + feedIn;
+
       } else {
-        // No consumption tracking: charge battery from dc_bypass, rest = feed-in
+        // No consumption: charge battery from dc_bypass, AC output = feed-in
         if (batCap > 0 && dc_bypass > 0 && batSoC < batUsable) {
-          const space  = batUsable - batSoC;
-          const ch     = Math.min(dc_bypass, batChargeW, space / sqrtEff);
-          batSoC      += ch * sqrtEff;
-          batCharge    = ch;
+          const space = batUsable - batSoC;
+          const ch    = Math.min(dc_bypass, batChargeW, space / sqrtEff);
+          batSoC += ch * sqrtEff; batCharge = ch;
         }
         feedIn = ac_out;
+        pvProduced = ac_out + batCharge;
       }
 
-      const produced = p_dc; // total DC production for day totals
+      // Usable PV production — capped by inverter + battery path, never raw DC
+      const produced = pvProduced;
 
       days[ds].hs.push({
         h:           +t.slice(11, 13),
-        kwh:         +produced.toFixed(3),   // total DC production
-        kwhNc:       +p_dc.toFixed(3),       // same (p_dc = full DC, no clip in DC-coupled)
+        kwh:         +produced.toFixed(3),   // usable PV production (capped)
+        kwhNc:       +produced.toFixed(3),   // chart forecast line — same capped value
         cs:          +cs_kwh.toFixed(3),
         poa:         Math.round(poaAvg),
         tCell:       +t_cell.toFixed(1),
@@ -2857,21 +2862,6 @@ function saveCalEntries(entries) {
   catch(e) {}
 }
 
-// Returns factor for a given cloud% — uses category-specific factor if enough data, else global
-function getCalFactorForCloud(cloud) {
-  const entries = loadCalEntries();
-  if (entries.length < 2) return 1;
-  const cat = cloudCategory(cloud);
-  const catEntries = entries.filter(e => e.cat === cat);
-  // Need at least 2 entries in category for category-specific factor
-  if (catEntries.length >= 2) {
-    const avg = catEntries.reduce((s, e) => s + e.ratio, 0) / catEntries.length;
-    return Math.max(0.5, Math.min(2.0, avg));
-  }
-  // Fall back to global factor
-  return getCalFactor();
-}
-
 function getCalFactor() {
   const entries = loadCalEntries();
   if (entries.length < 2) return 1;
@@ -3121,6 +3111,20 @@ function loadSettings() {
         el.value = data[id];
       }
     });
+
+    // Sync sliders FROM number fields — number field holds the exact value,
+    // slider may snap to its step. After restore, force slider = number value
+    // (clamped to slider range) so both agree. doCalc reads number fields.
+    [['iKwp','nKwp'],['iTilt','nTilt'],['iEff','nEff'],['iWr','nWr'],['iTc','nTc'],
+     ['iConsume','nConsume'],['iBat','nBat'],['iPrice','nPrice'],['iInvest','nInvest'],
+     ['iAutTarget','nAutTarget'],['iDegYears','nDegYears'],['iKwp2','nKwp2'],['iTilt2','nTilt2']]
+      .forEach(function(pair) {
+        const slider = document.getElementById(pair[0]);
+        const num    = document.getElementById(pair[1]);
+        if (slider && num && num.value !== '') {
+          slider.value = num.value; // browser clamps to step/range automatically for display
+        }
+      });
 
     // Trigger display-value spans — read from number input (not slider) to avoid step-snap
     // Map: [sliderId, numberId, spanId, decimals]
