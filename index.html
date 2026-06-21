@@ -773,7 +773,7 @@
     Jahresansicht: EUMETSAT CM SAF SARAH3 (Satellitenmessung seit 1983) via Open-Meteo<br>
     POA nach Duffie &amp; Beckman · NOCT-Temperaturkorrektur · DC-gekoppelte Batteriesimulation<br>
     Keine Registrierung · Keine API-Keys · Open Source · Wetterdaten: Open-Meteo (CC BY 4.0)<br>
-    <span style="color:var(--accent);font-weight:600;">v1.8.5</span>
+    <span style="color:var(--accent);font-weight:600;">v1.8.6</span>
   </p>
 </div>
 
@@ -1582,27 +1582,27 @@ async function doCalc() {
     }
 
     // ── Store RAW predictions BEFORE calibration ──────────────────
-    // Store every forecast day's value the first time we see it.
-    // First forecast for a date wins — never overwrite. This preserves
-    // what the model originally predicted, even if recalculated later.
+    // Strategy: the forecast made ON the day itself is the most accurate.
+    //  - For TODAY: always update with the latest day-of forecast (overwrite)
+    //  - For PAST days: never touch (locked — that was the final day-of value)
+    // This prevents an old multi-day-ahead forecast from sticking around,
+    // and prevents a recalculation on a later day from corrupting a past value.
     if (fData.length) {
       try {
         const todayStr = new Date().toISOString().slice(0, 10);
         const stored = JSON.parse(localStorage.getItem('solarTodayPred_v2') || '[]');
-        let changed = false;
         fData.forEach(function(d) {
-          // Only store today and (rarely) past days — future forecasts are less
-          // accurate than the day-of forecast, so we don't pre-store them
-          if (d.ds > todayStr) return;
-          if (!stored.find(e => e.ds === d.ds)) {
+          if (d.ds !== todayStr) return; // only store/refresh TODAY
+          const idx = stored.findIndex(e => e.ds === d.ds);
+          if (idx >= 0) {
+            // Refresh today's value with latest forecast (overwrite is fine — still "today")
+            stored[idx] = { ds: d.ds, kwh: d.kwh, cloud: d.cloud || 0 };
+          } else {
             stored.push({ ds: d.ds, kwh: d.kwh, cloud: d.cloud || 0 });
-            changed = true;
           }
         });
-        if (changed) {
-          stored.sort((a,b) => a.ds.localeCompare(b.ds));
-          localStorage.setItem('solarTodayPred_v2', JSON.stringify(stored.slice(-21)));
-        }
+        stored.sort((a,b) => a.ds.localeCompare(b.ds));
+        localStorage.setItem('solarTodayPred_v2', JSON.stringify(stored.slice(-21)));
       } catch(e) {}
     }
 
@@ -2992,26 +2992,19 @@ function buildCalDaySelect() {
 
   const todayStr = new Date().toISOString().slice(0, 10);
 
-  // Stored predictions = ORIGINAL forecasts saved on the day they were current.
-  // These take priority — they reflect what the model predicted at the time.
+  // Past days = ONLY stored day-of predictions. We never use recalculated
+  // forecast values for past days because recalculating gives different
+  // (often wrong) numbers than what the model predicted on the day itself.
   let storedPast = [];
   try {
     storedPast = JSON.parse(localStorage.getItem('solarTodayPred_v2') || '[]')
       .filter(e => e.ds < todayStr);
   } catch(e) {}
-  const storedDates = new Set(storedPast.map(e => e.ds));
 
-  // Forecast past days — only use if NOT already in stored predictions
-  // (recalculating a past day gives different values than the original forecast)
-  const forecastPast = (fData || [])
-    .filter(d => d.ds < todayStr)
-    .filter(d => !storedDates.has(d.ds)); // stored original wins
-
-  // Merge and sort descending (newest first)
-  const allPast = [
-    ...storedPast.map(e => ({ ds: e.ds, kwh: e.kwh, cloud: e.cloud != null ? e.cloud : 0, fIdx: -1 })),
-    ...forecastPast.map(d => ({ ds: d.ds, kwh: d.kwh, cloud: d.cloud || 0, fIdx: fData.indexOf(d) }))
-  ].sort((a, b) => b.ds.localeCompare(a.ds));
+  // Sort descending (newest first)
+  const allPast = storedPast
+    .map(e => ({ ds: e.ds, kwh: e.kwh, cloud: e.cloud != null ? e.cloud : 0, fIdx: -1 }))
+    .sort((a, b) => b.ds.localeCompare(a.ds));
 
   if (allPast.length === 0) {
     sel.innerHTML = '<option value="">— Noch keine vergangenen Tage —</option>';
@@ -3042,13 +3035,22 @@ function submitCalibration() {
 
   if (!ds || predicted < 0.1) { alert('Ungültiger Eintrag.'); return; }
 
+  const ratio = actual / predicted;
+  // Guard against corrupted/stale prediction values: a ratio outside 0.4–2.5
+  // almost always means the stored model value was wrong, not the panel.
+  if (ratio > 2.5 || ratio < 0.4) {
+    if (!confirm(`Ungewöhnliche Abweichung: erzeugt ${actual.toFixed(1)} kWh vs. Modell ${predicted.toFixed(1)} kWh (Faktor ${ratio.toFixed(2)}).\n\nDas deutet auf einen fehlerhaften gespeicherten Prognosewert hin. Trotzdem speichern?`)) {
+      return;
+    }
+  }
+
   // Only assign category if valid cloud data exists
   const cat = (cloud != null) ? cloudCategory(cloud) : null;
 
   const entries = loadCalEntries();
   const existing = entries.findIndex(e => e.date === ds);
   if (existing >= 0) entries.splice(existing, 1);
-  entries.push({ date: ds, predicted, actual, ratio: actual / predicted,
+  entries.push({ date: ds, predicted, actual, ratio,
                  cat: cat || 'unknown', cloud: cloud ?? -1 });
   saveCalEntries(entries);
   inp.value = '';
