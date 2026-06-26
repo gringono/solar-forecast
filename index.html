@@ -773,7 +773,7 @@
     Jahresansicht: EUMETSAT CM SAF SARAH3 (Satellitenmessung seit 1983) via Open-Meteo<br>
     POA nach Duffie &amp; Beckman · NOCT-Temperaturkorrektur · DC-gekoppelte Batteriesimulation<br>
     Keine Registrierung · Keine API-Keys · Open Source · Wetterdaten: Open-Meteo (CC BY 4.0)<br>
-    <span style="color:var(--accent);font-weight:600;">v1.8.6</span>
+    <span style="color:var(--accent);font-weight:600;">v1.8.7</span>
   </p>
 </div>
 
@@ -1556,7 +1556,9 @@ async function doCalc() {
     });
 
     fData = Object.entries(days).map(([ds, d]) => {
-      const totalSelfConsDay = d.hs.reduce((s, h) => s + h.selfDirect + h.batDischarge, 0);
+      // selfDirect already includes battery discharge that covered load (see energy balance).
+      // Adding batDischarge again would double-count.
+      const totalSelfConsDay = d.hs.reduce((s, h) => s + h.selfDirect, 0);
       return {
         ds,
         kwh:      +d.hs.reduce((s, h) => s + h.kwh, 0).toFixed(2),
@@ -1685,7 +1687,8 @@ async function doCalc() {
     fData.forEach((d, i) => {
       const ratio   = d.kwh / maxK;
       const col     = kwhColor(ratio);
-      const selfPct = gConsume > 0 ? Math.round(Math.min(d.selfCons, gConsume) / gConsume * 100) : 0;
+      const dayDemand = d.selfCons + d.gridDraw;
+      const selfPct = dayDemand > 0 ? Math.round(d.selfCons / dayDemand * 100) : 0;
       const el = document.createElement('div');
       el.className = 'day-card';
       el.innerHTML = `
@@ -2736,12 +2739,15 @@ function showWxPopup(d, cardEl) {
   const peakHour = d.hs.reduce((best, h) => h.kwh > best.kwh ? h : best, d.hs[0] || {h:0,kwh:0});
   const totalProd = d.kwh;
 
-  // selfCons = PV direct + battery discharge — can exceed PV production
-  // Show PV-direct and battery separately to avoid confusion
-  const selfDirect  = d.hs.reduce((s, h) => s + (h.selfDirect || 0), 0);
-  const batDischDay = d.hs.reduce((s, h) => s + (h.batDischarge || 0), 0);
-  const autarky = gConsume > 0
-    ? Math.round(Math.min(d.selfCons, gConsume) / gConsume * 100)
+  // selfDirect (per hour) includes battery discharge that covered load.
+  // Separate true PV-direct from battery discharge for clear display.
+  const totalSelfDir = d.hs.reduce((s, h) => s + (h.selfDirect || 0), 0);
+  const batDischDay  = d.hs.reduce((s, h) => s + (h.batDischarge || 0), 0);
+  const pvDirectOnly = Math.max(0, totalSelfDir - batDischDay); // PV → load directly
+  const totalSelfCons = totalSelfDir; // PV-direct + battery discharge
+  const dayDemand = totalSelfCons + d.gridDraw;
+  const autarky = dayDemand > 0
+    ? Math.round(totalSelfCons / dayDemand * 100)
     : null;
 
   const tempStr = d.tempMax != null ? `max. ${d.tempMax}°C` : '—';
@@ -2758,7 +2764,7 @@ function showWxPopup(d, cardEl) {
     ['🕐 Ertragspeak',     peakHour.h != null ? peakHour.h + ':00 Uhr' : '—'],
   ];
   if (gConsume > 0) {
-    rows.push(['🏠 PV direkt',     selfDirect.toFixed(1) + ' kWh']);
+    rows.push(['🏠 PV direkt',     pvDirectOnly.toFixed(1) + ' kWh']);
     if (batDischDay > 0.05) rows.push(['🔋 Akku-Entladung', batDischDay.toFixed(1) + ' kWh']);
     if (autarky !== null)   rows.push(['📊 Autarkie',        autarky + '%']);
   }
